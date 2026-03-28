@@ -10,7 +10,6 @@ export default function Navbar() {
     }}>
       <Link to="/">Tela 1</Link>
       <Link to="/tela2">Tela 2</Link>
-      <Link to="/tela3">Tela 3</Link>
     </nav>
   );
 }

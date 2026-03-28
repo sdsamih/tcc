@@ -13,7 +13,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Page1 />} />
           <Route path="/tela2" element={<Page2 />} />
-          <Route path="/tela3" element={<Page3 />} />
+          <Route path="/tela3/:id" element={<Page3 />} />
         </Routes>
       </div>
     </BrowserRouter>

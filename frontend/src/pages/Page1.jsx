@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+
 
 export default function Page1() {
   const [trains, setTrains] = useState([]);
@@ -25,6 +27,10 @@ export default function Page1() {
           {trains.map((train) => (
             <li key={train.id}>
               ID: {train.id} | Status: {train.status} | Progresso: {train.progress}%
+
+              <Link to={`/tela3/${train.id}`}>
+                <button>Ver detalhes</button>
+              </Link>
             </li>
           ))}
         </ul>
