@@ -1,8 +1,10 @@
 from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 import time
 import uuid
+import os
 
 from src.database import engine
 from src.models import Base
@@ -74,10 +76,19 @@ def real_training(train_id: str):
 
     loss, accuracy = model.evaluate(x_test, y_test, verbose=0)
 
+    # salvar modelo
+    models_dir = "models"
+    if not os.path.exists(models_dir):
+        os.makedirs(models_dir)
+    
+    model_path = os.path.join(models_dir, f"{train_id}.keras")
+    model.save(model_path)
+
     train.status = "ready"
     train.progress = 100
     train.accuracy = float(accuracy)
     train.loss = float(loss)
+    train.model_path = model_path
 
     db.commit()
     db.close()
@@ -119,7 +130,10 @@ def list_trains():
                 "epochs": t.epochs,
                 "learning_rate": t.learning_rate,
                 "batch_size": t.batch_size
-            }
+            },
+            "accuracy": t.accuracy,
+            "loss": t.loss,
+            "model_path": t.model_path
         })
 
     db.close()
@@ -144,5 +158,26 @@ def get_train(train_id: str):
             "epochs": t.epochs,
             "learning_rate": t.learning_rate,
             "batch_size": t.batch_size
-        }
+        },
+        "accuracy": t.accuracy,
+        "loss": t.loss,
+        "model_path": t.model_path
     }
+
+@app.get("/train/{train_id}/download")
+def download_model(train_id: str):
+    db = SessionLocal()
+    t = db.query(Train).filter(Train.id == train_id).first()
+    db.close()
+
+    if not t or not t.model_path:
+        return {"error": "model not found or not ready"}
+
+    if not os.path.exists(t.model_path):
+        return {"error": "model file not found"}
+
+    return FileResponse(
+        t.model_path,
+        media_type="application/octet-stream",
+        filename=f"{train_id}.keras"
+    )

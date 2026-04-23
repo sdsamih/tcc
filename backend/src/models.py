@@ -14,3 +14,4 @@ class Train(Base):
 
     accuracy = Column(Float, nullable=True)
     loss = Column(Float, nullable=True)
+    model_path = Column(String, nullable=True)
