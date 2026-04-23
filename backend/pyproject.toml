@@ -6,5 +6,6 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.135.2",
     "sqlalchemy>=2.0.48",
+    "tensorflow>=2.21.0",
     "uvicorn>=0.42.0",
 ]

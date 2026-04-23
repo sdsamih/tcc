@@ -11,3 +11,6 @@ class Train(Base):
 
     status = Column(String)
     progress = Column(Integer)
+
+    accuracy = Column(Float, nullable=True)
+    loss = Column(Float, nullable=True)
