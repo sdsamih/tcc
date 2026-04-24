@@ -9,7 +9,8 @@ export default function Navbar() {
       borderBottom: "1px solid #ccc"
     }}>
       <Link to="/">Tela 1</Link>
-      <Link to="/tela2">Tela 2</Link>
+      <Link to="/tela2">Criar Treino</Link>
+      <Link to="/upload-dataset">Upload Dataset</Link>
     </nav>
   );
 }

@@ -1,5 +1,16 @@
-from sqlalchemy import Column, String, Integer, Float
+from sqlalchemy import Column, String, Integer, Float, JSON
 from .database import Base
+
+class Dataset(Base):
+    __tablename__ = "datasets"
+
+    id = Column(String, primary_key=True, index=True)
+    name = Column(String)
+    path = Column(String)
+    classes = Column(JSON)  # Lista de nomes das classes
+    num_classes = Column(Integer)
+    input_shape = Column(JSON)  # Formato da entrada (ex: [224, 224, 3])
+    num_images = Column(Integer)
 
 class Train(Base):
     __tablename__ = "trains"
@@ -8,6 +19,8 @@ class Train(Base):
     epochs = Column(Integer)
     learning_rate = Column(Float)
     batch_size = Column(Integer)
+    dataset_id = Column(String, nullable=True)
+    architecture = Column(String, default="simple")
 
     status = Column(String)
     progress = Column(Integer)
@@ -15,3 +28,4 @@ class Train(Base):
     accuracy = Column(Float, nullable=True)
     loss = Column(Float, nullable=True)
     model_path = Column(String, nullable=True)
+    class_names = Column(JSON, nullable=True)

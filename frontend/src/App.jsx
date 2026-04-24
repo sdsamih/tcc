@@ -3,6 +3,7 @@ import Navbar from "./components/Navbar";
 import Page1 from "./pages/Page1";
 import Page2 from "./pages/Page2";
 import Page3 from "./pages/Page3";
+import Page4 from "./pages/Page4";
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
           <Route path="/" element={<Page1 />} />
           <Route path="/tela2" element={<Page2 />} />
           <Route path="/tela3/:id" element={<Page3 />} />
+          <Route path="/upload-dataset" element={<Page4 />} />
         </Routes>
       </div>
     </BrowserRouter>

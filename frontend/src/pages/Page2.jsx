@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 
@@ -6,9 +6,26 @@ export default function Page2() {
   const [epochs, setEpochs] = useState(10);
   const [learningRate, setLearningRate] = useState(0.001);
   const [batchSize, setBatchSize] = useState(32);
+  const [datasetId, setDatasetId] = useState("");
+  const [architecture, setArchitecture] = useState("simple");
+  const [datasets, setDatasets] = useState([]);
   const [message, setMessage] = useState("");
 
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchDatasets();
+  }, []);
+
+  const fetchDatasets = async () => {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/datasets");
+      const data = await response.json();
+      setDatasets(data);
+    } catch (error) {
+      console.error("Erro ao buscar datasets:", error);
+    }
+  };
 
 
 
@@ -19,6 +36,8 @@ export default function Page2() {
       epochs: Number(epochs),
       learning_rate: Number(learningRate),
       batch_size: Number(batchSize),
+      dataset_id: datasetId || null,
+      architecture: architecture,
     };
 
     try {
@@ -70,6 +89,34 @@ export default function Page2() {
             value={batchSize}
             onChange={(e) => setBatchSize(e.target.value)}
           />
+        </div>
+
+        <div>
+          <label>Dataset (opcional):</label>
+          <select
+            value={datasetId}
+            onChange={(e) => setDatasetId(e.target.value)}
+            style={{ marginLeft: "10px" }}
+          >
+            <option value="">MNIST (padrão)</option>
+            {datasets.map((ds) => (
+              <option key={ds.id} value={ds.id}>
+                {ds.name} ({ds.num_classes} classes, {ds.num_images} imagens)
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label>Arquitetura:</label>
+          <select
+            value={architecture}
+            onChange={(e) => setArchitecture(e.target.value)}
+            style={{ marginLeft: "10px" }}
+          >
+            <option value="simple">Simples (Dense)</option>
+            <option value="cnn">CNN (Recomendado para imagens)</option>
+          </select>
         </div>
 
         <button type="submit">Criar Treino</button>
