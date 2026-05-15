@@ -37,7 +37,7 @@ class TrainParams(BaseModel):
     epochs: int
     learning_rate: float
     batch_size: int
-    dataset_id: str = None
+    dataset_id: str | None = None
     architecture: str = "simple"  # "simple" ou "cnn"
 
 def real_training(train_id: str):
@@ -157,12 +157,15 @@ def create_train(params: TrainParams, background_tasks: BackgroundTasks):
 
     train_id = str(uuid.uuid4())
 
+    # Converter string vazia para None
+    dataset_id_to_use = params.dataset_id if params.dataset_id else None
+
     new_train = Train(
         id=train_id,
         epochs=params.epochs,
         learning_rate=params.learning_rate,
         batch_size=params.batch_size,
-        dataset_id=params.dataset_id,
+        dataset_id=dataset_id_to_use,
         architecture=params.architecture,
         status="training",
         progress=0

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Upload, FileArchive, Info, CheckCircle, AlertCircle } from "lucide-react";
 
 export default function Page4() {
   const [file, setFile] = useState(null);
@@ -49,12 +50,15 @@ export default function Page4() {
 
   return (
     <div>
-      <h1>Upload de Dataset</h1>
+      <h1 className="text-2xl font-semibold text-slate-800 mb-6">Datasets</h1>
 
-      <div style={{ marginBottom: "20px", padding: "15px", backgroundColor: "#f0f0f0", borderRadius: "5px" }}>
-        <h3>Estrutura do ZIP:</h3>
-        <p>O ZIP deve conter pastas, onde cada pasta representa uma classe:</p>
-        <pre style={{ backgroundColor: "#fff", padding: "10px", borderRadius: "3px" }}>
+      <div className="bg-white rounded-lg border border-slate-200 p-6 mb-6">
+        <div className="flex items-start gap-3 mb-4">
+          <Info className="text-blue-500 mt-0.5" size={20} />
+          <h3 className="font-medium text-slate-800">Estrutura do ZIP</h3>
+        </div>
+        <p className="text-slate-600 mb-4">O ZIP deve conter pastas, onde cada pasta representa uma classe:</p>
+        <pre className="bg-slate-50 p-4 rounded-lg text-sm text-slate-700 overflow-x-auto mb-4">
 {`dataset.zip
 ├── gato/
 │   ├── gato1.jpg
@@ -66,40 +70,65 @@ export default function Page4() {
 │   └── ...
 └── ...`}
         </pre>
-        <p>As imagens serão redimensionadas automaticamente para 28x28 pixels.</p>
+        <p className="text-sm text-slate-500">As imagens serão redimensionadas automaticamente para 28x28 pixels.</p>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: "15px" }}>
-          <label>Nome do Dataset:</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            style={{ marginLeft: "10px", padding: "5px" }}
-          />
+      <form onSubmit={handleSubmit} className="max-w-2xl">
+        <div className="bg-white rounded-lg border border-slate-200 p-6 space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Nome do Dataset</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none transition-all"
+              placeholder="Ex: Meu Dataset"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Arquivo ZIP</label>
+            <div className="relative">
+              <input
+                type="file"
+                accept=".zip"
+                onChange={(e) => setFile(e.target.files[0])}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none transition-all file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+              />
+            </div>
+            {file && (
+              <div className="mt-2 flex items-center gap-2 text-sm text-slate-600">
+                <FileArchive size={16} />
+                <span>{file.name}</span>
+              </div>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={uploading}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Upload size={18} />
+            {uploading ? "Enviando..." : "Upload"}
+          </button>
         </div>
 
-        <div style={{ marginBottom: "15px" }}>
-          <label>Arquivo ZIP:</label>
-          <input
-            type="file"
-            accept=".zip"
-            onChange={(e) => setFile(e.target.files[0])}
-            style={{ marginLeft: "10px" }}
-          />
-        </div>
-
-        <button type="submit" disabled={uploading}>
-          {uploading ? "Enviando..." : "Upload"}
-        </button>
+        {message && (
+          <div className={`mt-4 p-4 rounded-lg flex items-center gap-3 ${
+            message.includes("Erro") 
+              ? "bg-red-50 text-red-700 border border-red-200" 
+              : "bg-green-50 text-green-700 border border-green-200"
+          }`}>
+            {message.includes("Erro") ? (
+              <AlertCircle size={20} />
+            ) : (
+              <CheckCircle size={20} />
+            )}
+            <span>{message}</span>
+          </div>
+        )}
       </form>
-
-      {message && (
-        <p style={{ marginTop: "15px", color: message.includes("Erro") ? "red" : "green" }}>
-          {message}
-        </p>
-      )}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { Download, Upload, Image as ImageIcon, CheckCircle, Loader2, Clock, Settings, Target } from "lucide-react";
 
 export default function Page3() {
   const { id } = useParams();
@@ -33,7 +34,11 @@ export default function Page3() {
   }, [id]);
 
   if (!train) {
-    return <p>Carregando...</p>;
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="animate-spin text-slate-400" size={32} />
+      </div>
+    );
   }
 
   const handleDownload = async () => {
@@ -94,60 +99,156 @@ export default function Page3() {
     return classIndex;
   };
 
+  const getStatusIcon = () => {
+    switch (train.status) {
+      case "ready":
+        return <CheckCircle className="text-green-500" size={24} />;
+      case "training":
+        return <Loader2 className="text-blue-500 animate-spin" size={24} />;
+      default:
+        return <Clock className="text-slate-400" size={24} />;
+    }
+  };
+
+  const getStatusColor = () => {
+    switch (train.status) {
+      case "ready":
+        return "bg-green-100 text-green-700";
+      case "training":
+        return "bg-blue-100 text-blue-700";
+      default:
+        return "bg-slate-100 text-slate-700";
+    }
+  };
+
   return (
     <div>
-      <h1>Detalhes do Treino</h1>
+      <h1 className="text-2xl font-semibold text-slate-800 mb-6">Detalhes do Treino</h1>
 
-      <p><strong>ID:</strong> {train.id}</p>
-      <p><strong>Status:</strong> {train.status}</p>
-      <p><strong>Progresso:</strong> {train.progress}%</p>
+      <div className="bg-white rounded-lg border border-slate-200 p-6 mb-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            {getStatusIcon()}
+            <div>
+              <h2 className="text-xl font-semibold text-slate-800">Treino #{train.id}</h2>
+              <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor()}`}>
+                {train.status}
+              </span>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-slate-500">Progresso</p>
+            <p className="text-2xl font-semibold text-slate-800">{train.progress}%</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-slate-50 rounded-lg p-4">
+            <p className="text-sm text-slate-500 mb-1">Epochs</p>
+            <p className="text-lg font-semibold text-slate-800">{train.params.epochs}</p>
+          </div>
+          <div className="bg-slate-50 rounded-lg p-4">
+            <p className="text-sm text-slate-500 mb-1">Learning Rate</p>
+            <p className="text-lg font-semibold text-slate-800">{train.params.learning_rate}</p>
+          </div>
+          <div className="bg-slate-50 rounded-lg p-4">
+            <p className="text-sm text-slate-500 mb-1">Batch Size</p>
+            <p className="text-lg font-semibold text-slate-800">{train.params.batch_size}</p>
+          </div>
+        </div>
+      </div>
 
       {train.status === "ready" && (
         <>
-          <p><strong>Accuracy:</strong> {train.accuracy?.toFixed(4)}</p>
-          <p><strong>Loss:</strong> {train.loss?.toFixed(4)}</p>
-          <button onClick={handleDownload}>Baixar Modelo</button>
-
-          {train.class_names && (
-            <div style={{ marginTop: "20px", padding: "15px", backgroundColor: "#f0f0f0", borderRadius: "5px" }}>
-              <h3>Classes:</h3>
-              <ul>
-                {train.class_names.map((className, idx) => (
-                  <li key={idx}>{idx}: {className}</li>
-                ))}
-              </ul>
+          <div className="bg-white rounded-lg border border-slate-200 p-6 mb-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Settings className="text-slate-500" size={20} />
+              <h3 className="font-medium text-slate-800">Métricas</h3>
             </div>
-          )}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-slate-50 rounded-lg p-4">
+                <p className="text-sm text-slate-500 mb-1">Accuracy</p>
+                <p className="text-2xl font-semibold text-slate-800">{train.accuracy?.toFixed(4)}</p>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-4">
+                <p className="text-sm text-slate-500 mb-1">Loss</p>
+                <p className="text-2xl font-semibold text-slate-800">{train.loss?.toFixed(4)}</p>
+              </div>
+            </div>
 
-          <h2>Testar Inferência</h2>
-          <div>
-            <input type="file" onChange={handleFileChange} accept="image/*" />
-            <button onClick={handlePredict} disabled={!selectedFile}>
-              Prever
+            <button
+              onClick={handleDownload}
+              className="mt-4 flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors duration-200"
+            >
+              <Download size={18} />
+              Baixar Modelo
             </button>
           </div>
 
-          {previewUrl && (
-            <div>
-              <h3>Imagem:</h3>
-              <img src={previewUrl} alt="Preview" style={{ maxWidth: "200px" }} />
+          {train.class_names && (
+            <div className="bg-white rounded-lg border border-slate-200 p-6 mb-6">
+              <h3 className="font-medium text-slate-800 mb-4">Classes</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {train.class_names.map((className, idx) => (
+                  <div key={idx} className="bg-slate-50 rounded-lg px-3 py-2 text-sm text-slate-700">
+                    <span className="font-medium">{idx}:</span> {className}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
-          {prediction && (
-            <div>
-              <h3>Resultado:</h3>
-              <p><strong>Classe:</strong> {getClassName(prediction.predicted_class)}</p>
-              <p><strong>Confiança:</strong> {(prediction.confidence * 100).toFixed(2)}%</p>
+          <div className="bg-white rounded-lg border border-slate-200 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Target className="text-slate-500" size={20} />
+              <h3 className="font-medium text-slate-800">Testar Inferência</h3>
             </div>
-          )}
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Selecionar Imagem</label>
+                <input
+                  type="file"
+                  onChange={handleFileChange}
+                  accept="image/*"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none transition-all file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+                />
+              </div>
+
+              <button
+                onClick={handlePredict}
+                disabled={!selectedFile}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Upload size={18} />
+                Prever
+              </button>
+
+              {previewUrl && (
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-slate-700 mb-2">Preview</p>
+                  <div className="bg-slate-50 rounded-lg p-4 flex justify-center">
+                    <img src={previewUrl} alt="Preview" className="max-w-xs rounded-lg" />
+                  </div>
+                </div>
+              )}
+
+              {prediction && (
+                <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="text-green-600" size={20} />
+                    <h4 className="font-medium text-green-800">Resultado</h4>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-green-700"><strong>Classe:</strong> {getClassName(prediction.predicted_class)}</p>
+                    <p className="text-green-700"><strong>Confiança:</strong> {(prediction.confidence * 100).toFixed(2)}%</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </>
       )}
-
-      <h2>Parâmetros</h2>
-      <p>Epochs: {train.params.epochs}</p>
-      <p>Learning Rate: {train.params.learning_rate}</p>
-      <p>Batch Size: {train.params.batch_size}</p>
     </div>
   );
 }
