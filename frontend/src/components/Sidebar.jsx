@@ -20,7 +20,9 @@ export default function Sidebar() {
         <ul className="space-y-2">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.path;
+            const isActive = location.pathname === item.path || 
+                           (item.path === "/upload-dataset" && 
+                            (location.pathname === "/upload-dataset" || location.pathname === "/datasets-list"));
             
             return (
               <li key={item.path}>
