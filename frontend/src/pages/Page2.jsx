@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Database, Cpu, Play } from "lucide-react";
+import { Plus, Database, Cpu, Play, Info } from "lucide-react";
+import { Tooltip } from "react-tooltip";
 
 export default function Page2() {
   const [epochs, setEpochs] = useState(10);
@@ -75,7 +76,15 @@ export default function Page2() {
       <form onSubmit={handleSubmit} className="max-w-2xl">
         <div className="bg-white rounded-lg border border-slate-200 p-6 space-y-6">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Epochs</label>
+            <div className="flex items-center gap-2 mb-2">
+              <label className="block text-sm font-medium text-slate-700">Epochs</label>
+              <Info 
+                size={16} 
+                className="text-slate-400 cursor-help" 
+                data-tooltip-id="epochs-tooltip"
+                data-tooltip-place="right"
+              />
+            </div>
             <input
               type="number"
               value={epochs}
@@ -85,7 +94,15 @@ export default function Page2() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Learning Rate</label>
+            <div className="flex items-center gap-2 mb-2">
+              <label className="block text-sm font-medium text-slate-700">Learning Rate</label>
+              <Info 
+                size={16} 
+                className="text-slate-400 cursor-help" 
+                data-tooltip-id="learningrate-tooltip"
+                data-tooltip-place="right"
+              />
+            </div>
             <input
               type="number"
               step="0.0001"
@@ -96,7 +113,15 @@ export default function Page2() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Batch Size</label>
+            <div className="flex items-center gap-2 mb-2">
+              <label className="block text-sm font-medium text-slate-700">Batch Size</label>
+              <Info 
+                size={16} 
+                className="text-slate-400 cursor-help" 
+                data-tooltip-id="batchsize-tooltip"
+                data-tooltip-place="right"
+              />
+            </div>
             <input
               type="number"
               value={batchSize}
@@ -106,7 +131,15 @@ export default function Page2() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Dataset (opcional)</label>
+            <div className="flex items-center gap-2 mb-2">
+              <label className="block text-sm font-medium text-slate-700">Dataset (opcional)</label>
+              <Info 
+                size={16} 
+                className="text-slate-400 cursor-help" 
+                data-tooltip-id="dataset-tooltip"
+                data-tooltip-place="right"
+              />
+            </div>
             <select
               value={datasetId}
               onChange={(e) => setDatasetId(e.target.value)}
@@ -122,7 +155,15 @@ export default function Page2() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Arquitetura</label>
+            <div className="flex items-center gap-2 mb-2">
+              <label className="block text-sm font-medium text-slate-700">Arquitetura</label>
+              <Info 
+                size={16} 
+                className="text-slate-400 cursor-help" 
+                data-tooltip-id="architecture-tooltip"
+                data-tooltip-place="right"
+              />
+            </div>
             <select
               value={architecture}
               onChange={(e) => setArchitecture(e.target.value)}
@@ -146,6 +187,63 @@ export default function Page2() {
           <p className="mt-4 text-center text-red-600">{message}</p>
         )}
       </form>
+
+      <Tooltip id="epochs-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que é:</p>
+          <p className="mb-3">Número de vezes que o modelo vê todo o dataset durante o treinamento. Uma epoch = uma passagem completa pelos dados.</p>
+          <p className="font-semibold mb-2">Impactos:</p>
+          <p className="text-green-600 mb-1">✓ Mais epochs: Modelo aprende melhor, accuracy tende a aumentar</p>
+          <p className="text-red-600">✗ Muitas epochs: Overfitting, tempo maior de treinamento</p>
+        </div>
+      </Tooltip>
+
+      <Tooltip id="learningrate-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que é:</p>
+          <p className="mb-3">Taxa de aprendizado. Controla o tamanho do passo que o modelo dá ao ajustar os pesos. Valores comuns: 0.0001 a 0.01.</p>
+          <p className="font-semibold mb-2">Impactos:</p>
+          <p className="text-green-600 mb-1">✓ Taxa alta: Aprendizado rápido, mas pode não convergir</p>
+          <p className="text-green-600 mb-1">✓ Taxa baixa: Convergência mais estável, porém mais lenta</p>
+          <p className="text-red-600 mb-1">✗ Muito alta: Divergência, modelo não aprende</p>
+          <p className="text-red-600">✗ Muito baixa: Treinamento muito demorado</p>
+        </div>
+      </Tooltip>
+
+      <Tooltip id="batchsize-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que é:</p>
+          <p className="mb-3">Número de exemplos processados antes de atualizar os pesos do modelo. Batch size menor = mais atualizações por epoch.</p>
+          <p className="font-semibold mb-2">Impactos:</p>
+          <p className="text-green-600 mb-1">✓ Batch pequeno: Mais atualizações, melhor generalização, usa menos memória</p>
+          <p className="text-green-600 mb-1">✓ Batch grande: Treinamento mais rápido (GPU), gradientes mais estáveis</p>
+          <p className="text-red-600 mb-1">✗ Muito pequeno: Treinamento instável, ruído nos gradientes</p>
+          <p className="text-red-600">✗ Muito grande: Pode generalizar mal, requer mais memória</p>
+        </div>
+      </Tooltip>
+
+      <Tooltip id="dataset-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que é:</p>
+          <p className="mb-3">Conjunto de dados usado para treinar o modelo. Você pode usar o MNIST (dígitos 0-9) ou fazer upload de seu próprio dataset customizado.</p>
+          <p className="font-semibold mb-2">Opções:</p>
+          <p className="mb-2">• <strong>MNIST:</strong> Dataset padrão com 60.000 imagens de dígitos (0-9). Ideal para testes iniciais.</p>
+          <p>• <strong>Customizado:</strong> Seu próprio dataset em formato ZIP, organizado por pastas de classes.</p>
+        </div>
+      </Tooltip>
+
+      <Tooltip id="architecture-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que é:</p>
+          <p className="mb-3">Estrutura da rede neural. Define como as camadas são organizadas e como os dados fluem pelo modelo.</p>
+          <p className="font-semibold mb-2">Arquiteturas Disponíveis:</p>
+          <p className="mb-2">• <strong>Dense (Simples):</strong> Camadas totalmente conectadas. Boa para dados tabulares, mas limitada para imagens complexas.</p>
+          <p className="mb-3">• <strong>CNN:</strong> Usa filtros convolucionais para capturar padrões espaciais. Ideal para imagens, muito mais eficaz para classificação visual.</p>
+          <p className="font-semibold mb-2">Recomendação:</p>
+          <p className="text-green-600">✓ Use CNN para imagens (melhor desempenho)</p>
+          <p className="text-slate-500">• Use Dense apenas para testes rápidos ou datasets muito simples</p>
+        </div>
+      </Tooltip>
     </div>
   );
 }
