@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Download, Upload, Image as ImageIcon, CheckCircle, Loader2, Clock, Settings, Target } from "lucide-react";
+import { Download, Upload, Image as ImageIcon, CheckCircle, Loader2, Clock, Settings, Target, Info } from "lucide-react";
+import { Tooltip } from "react-tooltip";
 
 export default function DetalhesTreino() {
   const { id } = useParams();
@@ -137,22 +138,54 @@ export default function DetalhesTreino() {
             </div>
           </div>
           <div className="text-right">
-            <p className="text-sm text-slate-500">Progresso</p>
+            <div className="flex items-center gap-2 justify-end mb-1">
+              <p className="text-sm text-slate-500">Progresso</p>
+              <Info 
+                size={14} 
+                className="text-slate-400 cursor-help" 
+                data-tooltip-id="progress-tooltip"
+                data-tooltip-place="left"
+              />
+            </div>
             <p className="text-2xl font-semibold text-slate-800">{train.progress}%</p>
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-slate-50 rounded-lg p-4">
-            <p className="text-sm text-slate-500 mb-1">Epochs</p>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm text-slate-500">Epochs</p>
+              <Info 
+                size={14} 
+                className="text-slate-400 cursor-help" 
+                data-tooltip-id="epochs-tooltip"
+                data-tooltip-place="top"
+              />
+            </div>
             <p className="text-lg font-semibold text-slate-800">{train.params.epochs}</p>
           </div>
           <div className="bg-slate-50 rounded-lg p-4">
-            <p className="text-sm text-slate-500 mb-1">Learning Rate</p>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm text-slate-500">Learning Rate</p>
+              <Info 
+                size={14} 
+                className="text-slate-400 cursor-help" 
+                data-tooltip-id="learningrate-tooltip"
+                data-tooltip-place="top"
+              />
+            </div>
             <p className="text-lg font-semibold text-slate-800">{train.params.learning_rate}</p>
           </div>
           <div className="bg-slate-50 rounded-lg p-4">
-            <p className="text-sm text-slate-500 mb-1">Batch Size</p>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm text-slate-500">Batch Size</p>
+              <Info 
+                size={14} 
+                className="text-slate-400 cursor-help" 
+                data-tooltip-id="batchsize-tooltip"
+                data-tooltip-place="top"
+              />
+            </div>
             <p className="text-lg font-semibold text-slate-800">{train.params.batch_size}</p>
           </div>
         </div>
@@ -167,11 +200,27 @@ export default function DetalhesTreino() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-slate-50 rounded-lg p-4">
-                <p className="text-sm text-slate-500 mb-1">Accuracy</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-sm text-slate-500">Accuracy</p>
+                  <Info 
+                    size={14} 
+                    className="text-slate-400 cursor-help" 
+                    data-tooltip-id="accuracy-tooltip"
+                    data-tooltip-place="top"
+                  />
+                </div>
                 <p className="text-2xl font-semibold text-slate-800">{train.accuracy?.toFixed(4)}</p>
               </div>
               <div className="bg-slate-50 rounded-lg p-4">
-                <p className="text-sm text-slate-500 mb-1">Loss</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-sm text-slate-500">Loss</p>
+                  <Info 
+                    size={14} 
+                    className="text-slate-400 cursor-help" 
+                    data-tooltip-id="loss-tooltip"
+                    data-tooltip-place="top"
+                  />
+                </div>
                 <p className="text-2xl font-semibold text-slate-800">{train.loss?.toFixed(4)}</p>
               </div>
             </div>
@@ -187,7 +236,15 @@ export default function DetalhesTreino() {
 
           {train.class_names && (
             <div className="bg-white rounded-lg border border-slate-200 p-6 mb-6">
-              <h3 className="font-medium text-slate-800 mb-4">Classes</h3>
+              <div className="flex items-center gap-2 mb-4">
+                <h3 className="font-medium text-slate-800">Classes</h3>
+                <Info 
+                  size={14} 
+                  className="text-slate-400 cursor-help" 
+                  data-tooltip-id="classes-tooltip"
+                  data-tooltip-place="right"
+                />
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 {train.class_names.map((className, idx) => (
                   <div key={idx} className="bg-slate-50 rounded-lg px-3 py-2 text-sm text-slate-700">
@@ -249,6 +306,84 @@ export default function DetalhesTreino() {
           </div>
         </>
       )}
+
+      <Tooltip id="epochs-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que e:</p>
+          <p className="mb-3">Numero de vezes que o modelo ve todo o dataset durante o treinamento. Uma epoch = uma passagem completa pelos dados.</p>
+          <p className="font-semibold mb-2">Impactos:</p>
+          <p className="text-green-600 mb-1">Mais epochs: Modelo aprende melhor, accuracy tende a aumentar</p>
+          <p className="text-red-600">Muitas epochs: Overfitting, tempo maior de treinamento</p>
+        </div>
+      </Tooltip>
+
+      <Tooltip id="learningrate-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que e:</p>
+          <p className="mb-3">Taxa de aprendizado. Controla o tamanho do passo que o modelo da ao ajustar os pesos. Valores comuns: 0.0001 a 0.01.</p>
+          <p className="font-semibold mb-2">Impactos:</p>
+          <p className="text-green-600 mb-1">Taxa alta: Aprendizado rapido, mas pode nao convergir</p>
+          <p className="text-green-600 mb-1">Taxa baixa: Convergencia mais estavel, porem mais lenta</p>
+          <p className="text-red-600 mb-1">Muito alta: Divergencia, modelo nao aprende</p>
+          <p className="text-red-600">Muito baixa: Treinamento muito demorado</p>
+        </div>
+      </Tooltip>
+
+      <Tooltip id="batchsize-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que e:</p>
+          <p className="mb-3">Numero de exemplos processados antes de atualizar os pesos do modelo. Batch size menor = mais atualizacoes por epoch.</p>
+          <p className="font-semibold mb-2">Impactos:</p>
+          <p className="text-green-600 mb-1">Batch pequeno: Mais atualizacoes, melhor generalizacao, usa menos memoria</p>
+          <p className="text-green-600 mb-1">Batch grande: Treinamento mais rapido (GPU), gradientes mais estaveis</p>
+          <p className="text-red-600 mb-1">Muito pequeno: Treinamento instavel, ruido nos gradientes</p>
+          <p className="text-red-600">Muito grande: Pode generalizar mal, requer mais memoria</p>
+        </div>
+      </Tooltip>
+
+      <Tooltip id="accuracy-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que e:</p>
+          <p className="mb-3">Porcentagem de previsoes corretas do modelo nos dados de teste. Varia de 0 a 1 (ou 0% a 100%).</p>
+          <p className="font-semibold mb-2">Interpretacao:</p>
+          <p className="text-green-600 mb-1">maior que 0.9: Excelente</p>
+          <p className="text-green-600 mb-1">0.8-0.9: Bom</p>
+          <p className="text-yellow-600 mb-1">0.7-0.8: Aceitavel</p>
+          <p className="text-red-600">menor que 0.7: Precisa melhorar</p>
+        </div>
+      </Tooltip>
+
+      <Tooltip id="loss-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que e:</p>
+          <p className="mb-3">Medida de erro do modelo. Quanto menor, melhor. Representa a diferenca entre previsoes e valores reais.</p>
+          <p className="font-semibold mb-2">Interpretacao:</p>
+          <p className="text-green-600 mb-1">Loss baixo e estavel: Treinamento bem sucedido</p>
+          <p className="text-yellow-600 mb-1">Loss oscilando: Pode precisar ajuste de learning rate</p>
+          <p className="text-red-600 mb-1">Loss aumentando: Overfitting ou learning rate muito alto</p>
+          <p className="text-slate-500 mt-2">Loss ideal depende do problema, mas geralmente menor que 0.5 e bom para classificacao.</p>
+        </div>
+      </Tooltip>
+
+      <Tooltip id="classes-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que e:</p>
+          <p className="mb-3">Categorias que o modelo pode prever. Cada classe representa um grupo de saida possivel.</p>
+          <p className="font-semibold mb-2">Exemplos:</p>
+          <p className="mb-2">MNIST: 10 classes (digitos 0-9)</p>
+          <p>Customizado: Definido pelo seu dataset (ex: gato, cachorro, passaro)</p>
+        </div>
+      </Tooltip>
+
+      <Tooltip id="progress-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que e:</p>
+          <p className="mb-3">Porcentagem de conclusao do treinamento. Atualiza a cada epoch concluida.</p>
+          <p className="font-semibold mb-2">Status:</p>
+          <p className="text-blue-600 mb-1">0-99%: Treinando</p>
+          <p className="text-green-600">100%: Treino concluido, modelo pronto</p>
+        </div>
+      </Tooltip>
     </div>
   );
 }
