@@ -8,8 +8,8 @@ export default function Navbar() {
       padding: "16px",
       borderBottom: "1px solid #ccc"
     }}>
-      <Link to="/">Tela 1</Link>
-      <Link to="/tela2">Criar Treino</Link>
+      <Link to="/">Histórico</Link>
+      <Link to="/novo-treino">Criar Treino</Link>
       <Link to="/upload-dataset">Upload Dataset</Link>
     </nav>
   );

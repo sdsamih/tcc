@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Plus, Database, Cpu, Play, Info } from "lucide-react";
 import { Tooltip } from "react-tooltip";
 
-export default function Page2() {
+export default function NovoTreino() {
   const [epochs, setEpochs] = useState(10);
   const [learningRate, setLearningRate] = useState(0.001);
   const [batchSize, setBatchSize] = useState(32);
@@ -62,7 +62,7 @@ export default function Page2() {
         return;
       }
 
-      navigate(`/tela3/${data.train_id}`);
+      navigate(`/treino/${data.train_id}`);
     } catch (error) {
       console.error("Erro ao criar treino:", error);
       setMessage("Erro ao criar treino. Verifique se o backend está rodando.");

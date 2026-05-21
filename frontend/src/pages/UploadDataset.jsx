@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Upload, FileArchive, Info, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Database, Loader2 } from "lucide-react";
 
-export default function Page4() {
+export default function UploadDataset() {
   const [file, setFile] = useState(null);
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
@@ -99,7 +99,7 @@ export default function Page4() {
               onClick={() => {
                 setSelectedOption("list");
                 setShowMenu(false);
-                navigate("/datasets-list");
+                navigate("/datasets");
               }}
               className={`w-full flex items-center gap-3 px-6 py-4 hover:bg-slate-50 transition-colors duration-200 ${
                 selectedOption === "list" ? "bg-slate-50" : ""

@@ -6,7 +6,7 @@ export default function Sidebar() {
 
   const navItems = [
     { path: "/", label: "Histórico", icon: History },
-    { path: "/tela2", label: "Novo Treino", icon: PlusCircle },
+    { path: "/novo-treino", label: "Novo Treino", icon: PlusCircle },
     { path: "/upload-dataset", label: "Datasets", icon: Database },
   ];
 
@@ -22,7 +22,7 @@ export default function Sidebar() {
             const Icon = item.icon;
             const isActive = location.pathname === item.path || 
                            (item.path === "/upload-dataset" && 
-                            (location.pathname === "/upload-dataset" || location.pathname === "/datasets-list"));
+                            (location.pathname === "/upload-dataset" || location.pathname === "/datasets"));
             
             return (
               <li key={item.path}>

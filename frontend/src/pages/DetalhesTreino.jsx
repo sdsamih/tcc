@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Download, Upload, Image as ImageIcon, CheckCircle, Loader2, Clock, Settings, Target } from "lucide-react";
 
-export default function Page3() {
+export default function DetalhesTreino() {
   const { id } = useParams();
   const [train, setTrain] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);

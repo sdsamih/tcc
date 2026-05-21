@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Clock, CheckCircle, Loader2, ArrowRight } from "lucide-react";
 
-export default function Page1() {
+export default function HistoricoTreinos() {
   const [trains, setTrains] = useState([]);
 
   useEffect(() => {
@@ -67,7 +67,7 @@ export default function Page1() {
                     </div>
                   </div>
                 </div>
-                <Link to={`/tela3/${train.id}`}>
+                <Link to={`/treino/${train.id}`}>
                   <button className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors duration-200">
                     Ver detalhes
                     <ArrowRight size={16} />

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Database, Image as ImageIcon, Folder } from "lucide-react";
 
-export default function Page5() {
+export default function ListaDatasets() {
   const [datasets, setDatasets] = useState([]);
   const [loading, setLoading] = useState(true);
 
