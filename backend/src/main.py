@@ -20,6 +20,11 @@ import tensorflow as tf
 from tensorflow import keras
 
 app = FastAPI()
+
+# Configurar logging para não mostrar logs de acesso do Uvicorn
+import logging
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+
 Base.metadata.create_all(bind=engine)
 
 app.add_middleware(
@@ -78,7 +83,16 @@ def real_training(train_id: str):
         y_train = np.array(y_train)
         x_test = np.array(x_test)
         y_test = np.array(y_test)
-        
+
+        # Verificações de diagnóstico
+        print(f"Dataset: {dataset.name}")
+        print(f"Classes: {dataset.classes}")
+        print(f"x_train shape: {x_train.shape}, y_train shape: {y_train.shape}")
+        print(f"x_test shape: {x_test.shape}, y_test shape: {y_test.shape}")
+        print(f"Distribuição de classes no treino: {np.bincount(y_train)}")
+        print(f"Distribuição de classes no teste: {np.bincount(y_test)}")
+        print(f"x_train range: [{x_train.min():.4f}, {x_train.max():.4f}]")
+
         num_classes = dataset.num_classes
         class_names = dataset.classes
     else:
@@ -88,6 +102,11 @@ def real_training(train_id: str):
         x_test = x_test / 255.0
         num_classes = 10
         class_names = [str(i) for i in range(10)]
+
+        print(f"MNIST dataset carregado")
+        print(f"x_train shape: {x_train.shape}, y_train shape: {y_train.shape}")
+        print(f"Distribuição de classes no treino: {np.bincount(y_train)}")
+        print(f"Distribuição de classes no teste: {np.bincount(y_test)}")
 
     # modelo adaptável
     if train.architecture == "cnn":
@@ -120,13 +139,26 @@ def real_training(train_id: str):
     class ProgressCallback(keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):
             train.progress = int(((epoch + 1) / train.epochs) * 100)
+            if logs:
+                print(f"Epoch {epoch + 1}/{train.epochs} - loss: {logs.get('loss', 'N/A'):.4f} - accuracy: {logs.get('accuracy', 'N/A'):.4f} - val_loss: {logs.get('val_loss', 'N/A'):.4f} - val_accuracy: {logs.get('val_accuracy', 'N/A'):.4f}")
             db.commit()
+
+    # Embaralhar os dados para evitar problemas de ordenação
+    indices = np.random.permutation(len(x_train))
+    x_train = x_train[indices]
+    y_train = y_train[indices]
+
+    test_indices = np.random.permutation(len(x_test))
+    x_test = x_test[test_indices]
+    y_test = y_test[test_indices]
 
     model.fit(
         x_train,
         y_train,
         epochs=train.epochs,
         batch_size=train.batch_size,
+        shuffle=True,
+        validation_split=0.1,
         callbacks=[ProgressCallback()],
         verbose=0
     )
