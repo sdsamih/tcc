@@ -6,7 +6,7 @@ export default function Sidebar() {
 
   const navItems = [
     { path: "/", label: "Histórico", icon: History },
-    { path: "/novo-treino", label: "Novo Treino", icon: PlusCircle },
+    { path: "/novo-experimento", label: "Novo Experimento", icon: PlusCircle },
     { path: "/upload-dataset", label: "Datasets", icon: Database },
   ];
 

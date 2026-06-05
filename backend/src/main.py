@@ -14,7 +14,7 @@ from src.database import engine
 from src.models import Base
 from src.database import SessionLocal
 
-from src.models import Train, Dataset
+from src.models import Train, Dataset, Experiment
 
 import tensorflow as tf
 from tensorflow import keras
@@ -42,17 +42,26 @@ class TrainParams(BaseModel):
     epochs: int
     learning_rate: float
     batch_size: int
-    dataset_id: str | None = None
+    experiment_id: str  # Agora obrigatório
     architecture: str = "simple"  # "simple" ou "cnn"
+
+#modelo de dados para criar um experimento
+class ExperimentParams(BaseModel):
+    name: str
+    dataset_id: str | None = None
+    architecture: str = "simple"
 
 def real_training(train_id: str):
     db = SessionLocal()
 
     train = db.query(Train).filter(Train.id == train_id).first()
+    
+    # Buscar experimento associado ao treino
+    experiment = db.query(Experiment).filter(Experiment.id == train.experiment_id).first()
 
     # Carregar dataset
-    if train.dataset_id:
-        dataset = db.query(Dataset).filter(Dataset.id == train.dataset_id).first()
+    if experiment.dataset_id:
+        dataset = db.query(Dataset).filter(Dataset.id == experiment.dataset_id).first()
         
         # Carregar imagens do dataset customizado
         x_train = []
@@ -108,8 +117,8 @@ def real_training(train_id: str):
         print(f"Distribuição de classes no treino: {np.bincount(y_train)}")
         print(f"Distribuição de classes no teste: {np.bincount(y_test)}")
 
-    # modelo adaptável
-    if train.architecture == "cnn":
+    # modelo adaptável baseado na arquitetura do experimento
+    if experiment.architecture == "cnn":
         # CNN para melhor desempenho em imagens
         model = keras.Sequential([
             keras.layers.Reshape((28, 28, 1), input_shape=(28, 28)),
@@ -183,31 +192,148 @@ def real_training(train_id: str):
     db.commit()
     db.close()
 
-@app.post("/train")
-def create_train(params: TrainParams, background_tasks: BackgroundTasks):
+@app.post("/experiment")
+def create_experiment(params: ExperimentParams):
     db = SessionLocal()
-
-    train_id = str(uuid.uuid4())
-
+    
+    experiment_id = str(uuid.uuid4())
+    created_at = time.strftime("%Y-%m-%d %H:%M:%S")
+    
     # Converter string vazia para None
     dataset_id_to_use = params.dataset_id if params.dataset_id else None
+    
+    new_experiment = Experiment(
+        id=experiment_id,
+        name=params.name,
+        dataset_id=dataset_id_to_use,
+        architecture=params.architecture,
+        created_at=created_at
+    )
+    
+    db.add(new_experiment)
+    db.commit()
+    db.close()
+    
+    return {"experiment_id": experiment_id}
 
+@app.get("/experiment")
+def list_experiments():
+    db = SessionLocal()
+    experiments = db.query(Experiment).all()
+    
+    result = []
+    for exp in experiments:
+        # Contar quantos treinos tem neste experimento
+        train_count = db.query(Train).filter(Train.experiment_id == exp.id).count()
+        
+        result.append({
+            "id": exp.id,
+            "name": exp.name,
+            "dataset_id": exp.dataset_id,
+            "architecture": exp.architecture,
+            "created_at": exp.created_at,
+            "train_count": train_count
+        })
+    
+    db.close()
+    return result
+
+@app.get("/experiment/{experiment_id}")
+def get_experiment(experiment_id: str):
+    db = SessionLocal()
+    
+    exp = db.query(Experiment).filter(Experiment.id == experiment_id).first()
+    
+    if not exp:
+        db.close()
+        return {"error": "not found"}
+    
+    # Buscar todos os treinos deste experimento
+    trains = db.query(Train).filter(Train.experiment_id == experiment_id).all()
+    
+    trains_result = []
+    for t in trains:
+        trains_result.append({
+            "id": t.id,
+            "status": t.status,
+            "progress": t.progress,
+            "params": {
+                "epochs": t.epochs,
+                "learning_rate": t.learning_rate,
+                "batch_size": t.batch_size
+            },
+            "accuracy": t.accuracy,
+            "loss": t.loss,
+            "model_path": t.model_path,
+            "class_names": t.class_names
+        })
+    
+    db.close()
+    
+    return {
+        "id": exp.id,
+        "name": exp.name,
+        "dataset_id": exp.dataset_id,
+        "architecture": exp.architecture,
+        "created_at": exp.created_at,
+        "trains": trains_result
+    }
+
+@app.get("/experiment/{experiment_id}/trains")
+def list_experiment_trains(experiment_id: str):
+    db = SessionLocal()
+    
+    trains = db.query(Train).filter(Train.experiment_id == experiment_id).all()
+    
+    result = []
+    for t in trains:
+        result.append({
+            "id": t.id,
+            "status": t.status,
+            "progress": t.progress,
+            "params": {
+                "epochs": t.epochs,
+                "learning_rate": t.learning_rate,
+                "batch_size": t.batch_size
+            },
+            "accuracy": t.accuracy,
+            "loss": t.loss,
+            "model_path": t.model_path,
+            "class_names": t.class_names
+        })
+    
+    db.close()
+    return result
+
+@app.post("/experiment/{experiment_id}/train")
+def create_train_in_experiment(experiment_id: str, params: TrainParams, background_tasks: BackgroundTasks):
+    db = SessionLocal()
+    
+    # Verificar se o experimento existe
+    experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
+    if not experiment:
+        db.close()
+        return {"error": "experiment not found"}
+    
+    train_id = str(uuid.uuid4())
+    
     new_train = Train(
         id=train_id,
+        experiment_id=experiment_id,
         epochs=params.epochs,
         learning_rate=params.learning_rate,
         batch_size=params.batch_size,
-        dataset_id=dataset_id_to_use,
-        architecture=params.architecture,
         status="training",
         progress=0
     )
-
+    
     db.add(new_train)
     db.commit()
-
+    
     background_tasks.add_task(real_training, train_id)
-
+    
+    db.close()
+    
     return {"train_id": train_id}
 
 @app.get("/train")
@@ -230,8 +356,7 @@ def list_trains():
             "loss": t.loss,
             "model_path": t.model_path,
             "class_names": t.class_names,
-            "dataset_id": t.dataset_id,
-            "architecture": t.architecture
+            "experiment_id": t.experiment_id
         })
 
     db.close()
@@ -261,8 +386,7 @@ def get_train(train_id: str):
         "loss": t.loss,
         "model_path": t.model_path,
         "class_names": t.class_names,
-        "dataset_id": t.dataset_id,
-        "architecture": t.architecture
+        "experiment_id": t.experiment_id
     }
 
 @app.get("/train/{train_id}/download")
@@ -311,10 +435,12 @@ async def predict(train_id: str, file: UploadFile = File(...)):
     prediction = model.predict(image_array, verbose=0)
     predicted_class = int(np.argmax(prediction))
     confidence = float(prediction[0][predicted_class])
+    probabilities = prediction[0].tolist()  # Converter array numpy para lista
 
     return {
         "predicted_class": predicted_class,
-        "confidence": confidence
+        "confidence": confidence,
+        "probabilities": probabilities
     }
 
 @app.post("/datasets/upload")
