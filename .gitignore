@@ -3,3 +3,5 @@ node_modules
 trains.db
 models
 datasets
+backend/mnist_data/
+backend/uv.lock

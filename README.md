@@ -15,7 +15,7 @@ O projeto consiste em uma aplicação full-stack para treinamento de modelos de 
 
 ### Backend (Python/FastAPI)
 - **Framework**: FastAPI
-- **ML**: TensorFlow/Keras
+- **ML**: PyTorch
 - **Banco de Dados**: SQLite
 - **Gerenciador de Pacotes**: UV
 
@@ -34,7 +34,7 @@ tcc/
 │   │   ├── database.py      # Configuração do SQLite
 │   │   └── models.py        # Modelos SQLAlchemy (Train, Dataset)
 │   ├── datasets/            # Datasets customizados
-│   ├── models/              # Modelos treinados (.keras)
+│   ├── models/              # Modelos treinados (.pt)
 │   ├── trains.db            # Banco de dados SQLite
 │   └── pyproject.toml       # Dependências Python
 └── frontend/
@@ -57,7 +57,7 @@ tcc/
   
 - **GET /train**: Lista todos os treinamentos
 - **GET /train/{train_id}**: Obtém detalhes de um treinamento específico
-- **GET /train/{train_id}/download**: Baixa o modelo treinado (.keras)
+- **GET /train/{train_id}/download**: Baixa o modelo treinado (.pt)
 - **POST /train/{train_id}/predict**: Faz predição com imagem enviada
 
 #### Endpoints de Datasets
@@ -206,7 +206,7 @@ Após iniciar o backend, acesse:
 
 ## 🛠️ Tecnologias
 
-- **Backend**: FastAPI, TensorFlow, Keras, SQLAlchemy, SQLite
+- **Backend**: FastAPI, PyTorch, SQLAlchemy, SQLite
 - **Frontend**: React, Vite, React Router
 - **ML**: CNN, Dense Networks, MNIST, Custom Datasets
 - **Image Processing**: PIL, NumPy

@@ -16,8 +16,10 @@ from src.database import SessionLocal
 
 from src.models import Train, Dataset, Experiment
 
-import tensorflow as tf
-from tensorflow import keras
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torchvision import datasets, transforms
 
 app = FastAPI()
 
@@ -106,9 +108,14 @@ def real_training(train_id: str):
         class_names = dataset.classes
     else:
         # carregar MNIST
-        (x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
-        x_train = x_train / 255.0
-        x_test = x_test / 255.0
+        mnist_train = datasets.MNIST(root='./mnist_data', train=True, download=True, transform=transforms.ToTensor())
+        mnist_test = datasets.MNIST(root='./mnist_data', train=False, download=True, transform=transforms.ToTensor())
+        
+        x_train = mnist_train.data.numpy() / 255.0
+        y_train = mnist_train.targets.numpy()
+        x_test = mnist_test.data.numpy() / 255.0
+        y_test = mnist_test.targets.numpy()
+        
         num_classes = 10
         class_names = [str(i) for i in range(10)]
 
@@ -117,70 +124,123 @@ def real_training(train_id: str):
         print(f"Distribuição de classes no treino: {np.bincount(y_train)}")
         print(f"Distribuição de classes no teste: {np.bincount(y_test)}")
 
-    # modelo adaptável baseado na arquitetura do experimento
+    # Definir classes de modelo PyTorch
+    class SimpleModel(nn.Module):
+        def __init__(self, num_classes):
+            super(SimpleModel, self).__init__()
+            self.flatten = nn.Flatten()
+            self.fc1 = nn.Linear(28 * 28, 128)
+            self.fc2 = nn.Linear(128, num_classes)
+            self.relu = nn.ReLU()
+        
+        def forward(self, x):
+            x = self.flatten(x)
+            x = self.relu(self.fc1(x))
+            x = self.fc2(x)
+            return x
+    
+    class CNNModel(nn.Module):
+        def __init__(self, num_classes):
+            super(CNNModel, self).__init__()
+            self.conv1 = nn.Conv2d(1, 32, kernel_size=3)
+            self.pool = nn.MaxPool2d(2, 2)
+            self.conv2 = nn.Conv2d(32, 64, kernel_size=3)
+            self.flatten = nn.Flatten()
+            self.fc1 = nn.Linear(64 * 5 * 5, 128)
+            self.fc2 = nn.Linear(128, num_classes)
+            self.relu = nn.ReLU()
+        
+        def forward(self, x):
+            x = self.pool(self.relu(self.conv1(x)))
+            x = self.pool(self.relu(self.conv2(x)))
+            x = self.flatten(x)
+            x = self.relu(self.fc1(x))
+            x = self.fc2(x)
+            return x
+    
+    # Criar modelo baseado na arquitetura
     if experiment.architecture == "cnn":
-        # CNN para melhor desempenho em imagens
-        model = keras.Sequential([
-            keras.layers.Reshape((28, 28, 1), input_shape=(28, 28)),
-            keras.layers.Conv2D(32, (3, 3), activation='relu'),
-            keras.layers.MaxPooling2D((2, 2)),
-            keras.layers.Conv2D(64, (3, 3), activation='relu'),
-            keras.layers.MaxPooling2D((2, 2)),
-            keras.layers.Flatten(),
-            keras.layers.Dense(128, activation='relu'),
-            keras.layers.Dense(num_classes, activation='softmax')
-        ])
+        model = CNNModel(num_classes)
     else:
-        # Modelo simples (Dense)
-        model = keras.Sequential([
-            keras.layers.Flatten(input_shape=(28, 28)),
-            keras.layers.Dense(128, activation="relu"),
-            keras.layers.Dense(num_classes, activation="softmax")
-        ])
+        model = SimpleModel(num_classes)
+    
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=train.learning_rate)
 
-    model.compile(
-        optimizer=keras.optimizers.Adam(learning_rate=train.learning_rate),
-        loss="sparse_categorical_crossentropy",
-        metrics=["accuracy"]
-    )
+    # Converter dados para tensores PyTorch
+    x_train_tensor = torch.FloatTensor(x_train).unsqueeze(1)  # Adicionar canal
+    y_train_tensor = torch.LongTensor(y_train)
+    x_test_tensor = torch.FloatTensor(x_test).unsqueeze(1)
+    y_test_tensor = torch.LongTensor(y_test)
+    
+    # Criar DataLoader
+    train_dataset = torch.utils.data.TensorDataset(x_train_tensor, y_train_tensor)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=train.batch_size, shuffle=True)
 
-    # callback de progresso
-    class ProgressCallback(keras.callbacks.Callback):
-        def on_epoch_end(self, epoch, logs=None):
-            train.progress = int(((epoch + 1) / train.epochs) * 100)
-            if logs:
-                print(f"Epoch {epoch + 1}/{train.epochs} - loss: {logs.get('loss', 'N/A'):.4f} - accuracy: {logs.get('accuracy', 'N/A'):.4f} - val_loss: {logs.get('val_loss', 'N/A'):.4f} - val_accuracy: {logs.get('val_accuracy', 'N/A'):.4f}")
-            db.commit()
-
-    # Embaralhar os dados para evitar problemas de ordenação
-    indices = np.random.permutation(len(x_train))
-    x_train = x_train[indices]
-    y_train = y_train[indices]
-
-    test_indices = np.random.permutation(len(x_test))
-    x_test = x_test[test_indices]
-    y_test = y_test[test_indices]
-
-    model.fit(
-        x_train,
-        y_train,
-        epochs=train.epochs,
-        batch_size=train.batch_size,
-        shuffle=True,
-        validation_split=0.1,
-        callbacks=[ProgressCallback()],
-        verbose=0
-    )
-
-    loss, accuracy = model.evaluate(x_test, y_test, verbose=0)
+    # Loop de treinamento
+    for epoch in range(train.epochs):
+        model.train()
+        running_loss = 0.0
+        correct = 0
+        total = 0
+        
+        for batch_idx, (inputs, labels) in enumerate(train_loader):
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            
+            running_loss += loss.item()
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+        
+        # Validação
+        model.eval()
+        val_loss = 0.0
+        val_correct = 0
+        val_total = 0
+        
+        with torch.no_grad():
+            # Usar parte dos dados para validação (10%)
+            val_size = int(len(x_test_tensor) * 0.1)
+            val_inputs = x_test_tensor[:val_size]
+            val_labels = y_test_tensor[:val_size]
+            
+            outputs = model(val_inputs)
+            val_loss = criterion(outputs, val_labels).item()
+            _, predicted = torch.max(outputs.data, 1)
+            val_total = val_labels.size(0)
+            val_correct = (predicted == val_labels).sum().item()
+        
+        # Atualizar progresso
+        train.progress = int(((epoch + 1) / train.epochs) * 100)
+        train_accuracy = correct / total
+        val_accuracy = val_correct / val_total
+        
+        print(f"Epoch {epoch + 1}/{train.epochs} - loss: {running_loss/len(train_loader):.4f} - accuracy: {train_accuracy:.4f} - val_loss: {val_loss:.4f} - val_accuracy: {val_accuracy:.4f}")
+        db.commit()
+    
+    # Avaliação final
+    model.eval()
+    with torch.no_grad():
+        outputs = model(x_test_tensor)
+        loss = criterion(outputs, y_test_tensor).item()
+        _, predicted = torch.max(outputs.data, 1)
+        accuracy = (predicted == y_test_tensor).sum().item() / len(y_test_tensor)
 
     # salvar modelo
     models_dir = "models"
     if not os.path.exists(models_dir):
         os.makedirs(models_dir)
     
-    model_path = os.path.join(models_dir, f"{train_id}.keras")
-    model.save(model_path)
+    model_path = os.path.join(models_dir, f"{train_id}.pt")
+    torch.save({
+        'model_state_dict': model.state_dict(),
+        'num_classes': num_classes,
+        'architecture': experiment.architecture
+    }, model_path)
 
     train.status = "ready"
     train.progress = 100
@@ -404,7 +464,7 @@ def download_model(train_id: str):
     return FileResponse(
         t.model_path,
         media_type="application/octet-stream",
-        filename=f"{train_id}.keras"
+        filename=f"{train_id}.pt"
     )
 
 @app.post("/train/{train_id}/predict")
@@ -420,7 +480,52 @@ async def predict(train_id: str, file: UploadFile = File(...)):
         return {"error": "model file not found"}
 
     # carregar modelo
-    model = keras.models.load_model(t.model_path)
+    checkpoint = torch.load(t.model_path, map_location='cpu')
+    
+    # Recriar modelo baseado na arquitetura salva
+    num_classes = checkpoint['num_classes']
+    architecture = checkpoint['architecture']
+    
+    class SimpleModel(nn.Module):
+        def __init__(self, num_classes):
+            super(SimpleModel, self).__init__()
+            self.flatten = nn.Flatten()
+            self.fc1 = nn.Linear(28 * 28, 128)
+            self.fc2 = nn.Linear(128, num_classes)
+            self.relu = nn.ReLU()
+        
+        def forward(self, x):
+            x = self.flatten(x)
+            x = self.relu(self.fc1(x))
+            x = self.fc2(x)
+            return x
+    
+    class CNNModel(nn.Module):
+        def __init__(self, num_classes):
+            super(CNNModel, self).__init__()
+            self.conv1 = nn.Conv2d(1, 32, kernel_size=3)
+            self.pool = nn.MaxPool2d(2, 2)
+            self.conv2 = nn.Conv2d(32, 64, kernel_size=3)
+            self.flatten = nn.Flatten()
+            self.fc1 = nn.Linear(64 * 5 * 5, 128)
+            self.fc2 = nn.Linear(128, num_classes)
+            self.relu = nn.ReLU()
+        
+        def forward(self, x):
+            x = self.pool(self.relu(self.conv1(x)))
+            x = self.pool(self.relu(self.conv2(x)))
+            x = self.flatten(x)
+            x = self.relu(self.fc1(x))
+            x = self.fc2(x)
+            return x
+    
+    if architecture == "cnn":
+        model = CNNModel(num_classes)
+    else:
+        model = SimpleModel(num_classes)
+    
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model.eval()
 
     # ler imagem
     contents = await file.read()
@@ -429,13 +534,15 @@ async def predict(train_id: str, file: UploadFile = File(...)):
 
     image = Image.open(io.BytesIO(contents)).convert('L').resize((28, 28))
     image_array = np.array(image) / 255.0
-    image_array = image_array.reshape(1, 28, 28)
+    image_tensor = torch.FloatTensor(image_array).unsqueeze(0).unsqueeze(0)  # (1, 1, 28, 28)
 
     # predição
-    prediction = model.predict(image_array, verbose=0)
-    predicted_class = int(np.argmax(prediction))
-    confidence = float(prediction[0][predicted_class])
-    probabilities = prediction[0].tolist()  # Converter array numpy para lista
+    with torch.no_grad():
+        outputs = model(image_tensor)
+        probabilities = torch.softmax(outputs, dim=1)
+        predicted_class = int(torch.argmax(probabilities, dim=1).item())
+        confidence = float(probabilities[0][predicted_class].item())
+        probabilities = probabilities[0].tolist()
 
     return {
         "predicted_class": predicted_class,

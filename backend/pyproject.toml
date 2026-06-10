@@ -8,6 +8,7 @@ dependencies = [
     "pillow>=12.2.0",
     "python-multipart>=0.0.26",
     "sqlalchemy>=2.0.48",
-    "tensorflow>=2.21.0",
+    "torch>=2.5.0",
+    "torchvision>=0.20.0",
     "uvicorn>=0.42.0",
 ]
