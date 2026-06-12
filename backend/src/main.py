@@ -17,14 +17,12 @@ from src.models import Base
 from src.database import SessionLocal
 from src.models import Train, Dataset, Experiment
 
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras.applications import MobileNet, ResNet50, InceptionV3, Xception, DenseNet121
-from tensorflow.keras.applications.mobilenet import preprocess_input as mobilenet_preprocess
-from tensorflow.keras.applications.resnet50 import preprocess_input as resnet50_preprocess
-from tensorflow.keras.applications.inception_v3 import preprocess_input as inception_v3_preprocess
-from tensorflow.keras.applications.xception import preprocess_input as xception_preprocess
-from tensorflow.keras.applications.densenet import preprocess_input as densenet_preprocess
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import Dataset as TorchDataset, DataLoader
+import torchvision.transforms as transforms
+import torchvision.models as models
 
 app = FastAPI()
 
@@ -40,15 +38,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 TRANSFER_LEARNING_MODELS = ["mobilenet", "resnet50", "inceptionv3", "xception", "densenet121"]
 
-PREPROCESS_FN = {
-    "mobilenet": mobilenet_preprocess,
-    "resnet50": resnet50_preprocess,
-    "inceptionv3": inception_v3_preprocess,
-    "xception": xception_preprocess,
-    "densenet121": densenet_preprocess,
-}
+# ImageNet mean/std para normalização dos modelos de transfer learning
+IMAGENET_MEAN = [0.485, 0.456, 0.406]
+IMAGENET_STD  = [0.229, 0.224, 0.225]
 
 
 class TrainParams(BaseModel):
@@ -65,87 +61,141 @@ class ExperimentParams(BaseModel):
     architecture: str = "simple"
 
 
-def load_image(path, target_size):
-    """Abre imagem e força RGB, preservando os valores originais."""
-    return Image.open(path).convert("RGB").resize(target_size)
+# ---------------------------------------------------------------------------
+# Dataset
+# ---------------------------------------------------------------------------
 
+class ImageFileDataset(TorchDataset):
+    """
+    Carrega imagens do disco sob demanda.
+    samples: lista de (path_ou_array, label)
+    """
 
-def build_model(architecture, num_classes):
-    if architecture in TRANSFER_LEARNING_MODELS:
-        base_model_cls = {
-            "mobilenet": MobileNet,
-            "resnet50": ResNet50,
-            "inceptionv3": InceptionV3,
-            "xception": Xception,
-            "densenet121": DenseNet121,
-        }[architecture]
-
-        base_model = base_model_cls(weights="imagenet", include_top=False, input_shape=(224, 224, 3))
-        base_model.trainable = False
-
-        inputs = keras.Input(shape=(224, 224, 3))
-        x = base_model(inputs)
-        x = keras.layers.GlobalAveragePooling2D()(x)
-        x = keras.layers.Dense(128, activation="relu")(x)
-        x = keras.layers.Dropout(0.2)(x)
-        outputs = keras.layers.Dense(num_classes, activation="softmax")(x)
-        return keras.Model(inputs=inputs, outputs=outputs)
-
-    elif architecture == "cnn":
-        return keras.Sequential([
-            keras.layers.Conv2D(32, (3, 3), activation="relu", input_shape=(28, 28, 3)),
-            keras.layers.MaxPooling2D((2, 2)),
-            keras.layers.Conv2D(64, (3, 3), activation="relu"),
-            keras.layers.MaxPooling2D((2, 2)),
-            keras.layers.Flatten(),
-            keras.layers.Dense(128, activation="relu"),
-            keras.layers.Dense(num_classes, activation="softmax"),
-        ])
-
-    else:  # simple
-        return keras.Sequential([
-            keras.layers.Flatten(input_shape=(28, 28, 3)),
-            keras.layers.Dense(128, activation="relu"),
-            keras.layers.Dense(num_classes, activation="softmax"),
-        ])
-
-
-class ImageDataGenerator(keras.utils.Sequence):
-    """Carrega imagens do disco em batches, sem manter tudo na RAM."""
-
-    def __init__(self, samples, batch_size, target_size, preprocess_fn):
-        # samples: lista de (path, label) ou (array, label) para MNIST
+    def __init__(self, samples, transform):
         self.samples = samples
-        self.batch_size = batch_size
-        self.target_size = target_size
-        self.preprocess_fn = preprocess_fn
-        self.indices = np.arange(len(samples))
-        np.random.shuffle(self.indices)
+        self.transform = transform
 
     def __len__(self):
-        return int(np.ceil(len(self.samples) / self.batch_size))
+        return len(self.samples)
 
     def __getitem__(self, idx):
-        batch_indices = self.indices[idx * self.batch_size:(idx + 1) * self.batch_size]
-        batch = [self.samples[i] for i in batch_indices]
+        path_or_array, label = self.samples[idx]
 
-        images = []
-        labels = []
-        for path_or_array, label in batch:
-            if isinstance(path_or_array, str):
-                img_array = np.array(load_image(path_or_array, self.target_size), dtype="float32")
-            else:
-                img_array = path_or_array.astype("float32")
-            images.append(img_array)
-            labels.append(label)
+        if isinstance(path_or_array, str):
+            img = Image.open(path_or_array).convert("RGB")
+        else:
+            img = Image.fromarray(path_or_array).convert("RGB")
 
-        x = np.array(images)
-        x = self.preprocess_fn(x)
-        return x, np.array(labels)
+        return self.transform(img), label
 
-    def on_epoch_end(self):
-        np.random.shuffle(self.indices)
 
+def make_transform(architecture):
+    """Retorna o transform correto para cada arquitetura."""
+    if architecture in TRANSFER_LEARNING_MODELS:
+        size = 224
+        return transforms.Compose([
+            transforms.Resize((size, size)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+        ])
+    else:
+        return transforms.Compose([
+            transforms.Resize((28, 28)),
+            transforms.ToTensor(),  # já normaliza para [0, 1]
+        ])
+
+
+# ---------------------------------------------------------------------------
+# Modelos
+# ---------------------------------------------------------------------------
+
+def build_model(architecture, num_classes):
+    if architecture == "mobilenet":
+        model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.IMAGENET1K_V1)
+        for p in model.parameters():
+            p.requires_grad = False
+        model.classifier = nn.Sequential(
+            nn.Dropout(0.2),
+            nn.Linear(model.last_channel, 128),
+            nn.ReLU(),
+            nn.Linear(128, num_classes),
+        )
+
+    elif architecture == "resnet50":
+        model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
+        for p in model.parameters():
+            p.requires_grad = False
+        model.fc = nn.Sequential(
+            nn.Linear(model.fc.in_features, 128),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(128, num_classes),
+        )
+
+    elif architecture == "inceptionv3":
+        model = models.inception_v3(weights=models.Inception_V3_Weights.IMAGENET1K_V1)
+        for p in model.parameters():
+            p.requires_grad = False
+        model.fc = nn.Sequential(
+            nn.Linear(model.fc.in_features, 128),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(128, num_classes),
+        )
+        model.aux_logits = False
+
+    elif architecture == "xception":
+        # torchvision nao tem Xception; usa EfficientNet-B0 como substituto equivalente
+        model = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.IMAGENET1K_V1)
+        for p in model.parameters():
+            p.requires_grad = False
+        in_features = model.classifier[1].in_features
+        model.classifier = nn.Sequential(
+            nn.Dropout(0.2),
+            nn.Linear(in_features, 128),
+            nn.ReLU(),
+            nn.Linear(128, num_classes),
+        )
+
+    elif architecture == "densenet121":
+        model = models.densenet121(weights=models.DenseNet121_Weights.IMAGENET1K_V1)
+        for p in model.parameters():
+            p.requires_grad = False
+        model.classifier = nn.Sequential(
+            nn.Linear(model.classifier.in_features, 128),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(128, num_classes),
+        )
+
+    elif architecture == "cnn":
+        model = nn.Sequential(
+            nn.Conv2d(3, 32, 3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(32, 64, 3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Flatten(),
+            nn.Linear(64 * 7 * 7, 128),
+            nn.ReLU(),
+            nn.Linear(128, num_classes),
+        )
+
+    else:  # simple
+        model = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(28 * 28 * 3, 128),
+            nn.ReLU(),
+            nn.Linear(128, num_classes),
+        )
+
+    return model.to(DEVICE)
+
+
+# ---------------------------------------------------------------------------
+# Treinamento
+# ---------------------------------------------------------------------------
 
 def real_training(train_id: str):
     db = SessionLocal()
@@ -153,114 +203,192 @@ def real_training(train_id: str):
     train = db.query(Train).filter(Train.id == train_id).first()
     experiment = db.query(Experiment).filter(Experiment.id == train.experiment_id).first()
 
-    is_transfer_learning = experiment.architecture in TRANSFER_LEARNING_MODELS
-    target_size = (224, 224) if is_transfer_learning else (28, 28)
-
-    if is_transfer_learning:
-        preprocess_fn = PREPROCESS_FN[experiment.architecture]
-    else:
-        preprocess_fn = lambda x: x / 255.0
+    transform = make_transform(experiment.architecture)
 
     if experiment.dataset_id:
         dataset = db.query(Dataset).filter(Dataset.id == experiment.dataset_id).first()
 
-        train_samples, test_samples = [], []
-
+        all_samples = []
         for class_idx, class_name in enumerate(dataset.classes):
             class_path = os.path.join(dataset.path, class_name)
-            images = os.listdir(class_path)
-            split_idx = int(len(images) * 0.8)
-
-            for i, img_file in enumerate(images):
-                img_path = os.path.join(class_path, img_file)
-                if i < split_idx:
-                    train_samples.append((img_path, class_idx))
-                else:
-                    test_samples.append((img_path, class_idx))
+            images = sorted(os.listdir(class_path))
+            for img_file in images:
+                all_samples.append((os.path.join(class_path, img_file), class_idx))
 
         num_classes = dataset.num_classes
         class_names = dataset.classes
 
     else:
-        # MNIST — converte para RGB antecipadamente (dataset pequeno, cabe na RAM)
-        (x_raw_train, y_raw_train), (x_raw_test, y_raw_test) = keras.datasets.mnist.load_data()
+        import torchvision.datasets as tv_datasets
+        mnist = tv_datasets.MNIST(root="/tmp/mnist", train=True, download=True)
+        mnist_test = tv_datasets.MNIST(root="/tmp/mnist", train=False, download=True)
 
-        def mnist_to_rgb(data):
-            imgs = []
-            for img in data:
-                arr = np.array(Image.fromarray(img.astype("uint8")).convert("RGB").resize(target_size))
-                imgs.append(arr)
-            return imgs
+        # Converter para lista de (array, label) para reutilizar ImageFileDataset
+        def mnist_samples(ds):
+            return [(np.array(img), int(label)) for img, label in ds]
 
-        mnist_train_imgs = mnist_to_rgb(x_raw_train)
-        mnist_test_imgs = mnist_to_rgb(x_raw_test)
-
-        train_samples = list(zip(mnist_train_imgs, y_raw_train.tolist()))
-        test_samples = list(zip(mnist_test_imgs, y_raw_test.tolist()))
+        all_samples = mnist_samples(mnist)
+        test_samples = mnist_samples(mnist_test)
 
         num_classes = 10
         class_names = [str(i) for i in range(10)]
 
-    np.random.shuffle(train_samples)
-    np.random.shuffle(test_samples)
+    # Split treino/validacao/teste para dataset customizado
+    if experiment.dataset_id:
+        np.random.shuffle(all_samples)
+        n = len(all_samples)
+        test_split = int(n * 0.2)
+        val_split  = int((n - test_split) * 0.1)
 
-    # Separar validação dos dados de treino (10%)
-    val_split = int(len(train_samples) * 0.1)
-    val_samples = train_samples[:val_split]
-    fit_samples = train_samples[val_split:]
+        test_samples = all_samples[:test_split]
+        val_samples  = all_samples[test_split:test_split + val_split]
+        fit_samples  = all_samples[test_split + val_split:]
+    else:
+        np.random.shuffle(all_samples)
+        val_split = int(len(all_samples) * 0.1)
+        val_samples = all_samples[:val_split]
+        fit_samples = all_samples[val_split:]
 
-    print(f"Treino: {len(fit_samples)}, Validação: {len(val_samples)}, Teste: {len(test_samples)}")
-    print(f"Classes: {class_names}")
+    print(f"Treino: {len(fit_samples)}, Validacao: {len(val_samples)}, Teste: {len(test_samples)}")
+    print(f"Classes: {class_names}, device: {DEVICE}")
 
-    train_gen = ImageDataGenerator(fit_samples, train.batch_size, target_size, preprocess_fn)
-    val_gen = ImageDataGenerator(val_samples, train.batch_size, target_size, preprocess_fn)
-    test_gen = ImageDataGenerator(test_samples, train.batch_size, target_size, preprocess_fn)
+    train_loader = DataLoader(
+        ImageFileDataset(fit_samples, transform),
+        batch_size=train.batch_size,
+        shuffle=True,
+        num_workers=0,
+        pin_memory=False,
+    )
+    val_loader = DataLoader(
+        ImageFileDataset(val_samples, transform),
+        batch_size=train.batch_size,
+        shuffle=False,
+        num_workers=0,
+    )
+    test_loader = DataLoader(
+        ImageFileDataset(test_samples, transform),
+        batch_size=train.batch_size,
+        shuffle=False,
+        num_workers=0,
+    )
 
     model = build_model(experiment.architecture, num_classes)
-    model.compile(
-        optimizer=keras.optimizers.Adam(learning_rate=train.learning_rate),
-        loss="sparse_categorical_crossentropy",
-        metrics=["accuracy"],
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(
+        filter(lambda p: p.requires_grad, model.parameters()),
+        lr=train.learning_rate,
     )
 
-    class ProgressCallback(keras.callbacks.Callback):
-        def on_epoch_end(self, epoch, logs=None):
-            train.progress = int(((epoch + 1) / train.epochs) * 100)
-            if logs:
-                print(
-                    f"Epoch {epoch + 1}/{train.epochs} "
-                    f"- loss: {logs.get('loss', 0):.4f} "
-                    f"- accuracy: {logs.get('accuracy', 0):.4f} "
-                    f"- val_loss: {logs.get('val_loss', 0):.4f} "
-                    f"- val_accuracy: {logs.get('val_accuracy', 0):.4f}"
-                )
-            db.commit()
+    for epoch in range(train.epochs):
+        # treino
+        model.train()
+        running_loss = 0.0
+        correct = 0
+        total = 0
 
-    model.fit(
-        train_gen,
-        validation_data=val_gen,
-        epochs=train.epochs,
-        callbacks=[ProgressCallback()],
-        verbose=0,
-    )
+        for inputs, labels in train_loader:
+            inputs = inputs.to(DEVICE)
+            labels = torch.tensor(labels).to(DEVICE) if not isinstance(labels, torch.Tensor) else labels.to(DEVICE)
 
-    loss, accuracy = model.evaluate(test_gen, verbose=0)
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            running_loss += loss.item() * inputs.size(0)
+            correct += (outputs.argmax(1) == labels).sum().item()
+            total += inputs.size(0)
+
+        train_loss = running_loss / total
+        train_acc  = correct / total
+
+        # validacao
+        model.eval()
+        val_loss = 0.0
+        val_correct = 0
+        val_total = 0
+
+        with torch.no_grad():
+            for inputs, labels in val_loader:
+                inputs = inputs.to(DEVICE)
+                labels = torch.tensor(labels).to(DEVICE) if not isinstance(labels, torch.Tensor) else labels.to(DEVICE)
+
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
+
+                val_loss += loss.item() * inputs.size(0)
+                val_correct += (outputs.argmax(1) == labels).sum().item()
+                val_total += inputs.size(0)
+
+        val_loss /= val_total
+        val_acc   = val_correct / val_total
+
+        train.progress = int(((epoch + 1) / train.epochs) * 100)
+        db.commit()
+
+        print(
+            f"Epoch {epoch + 1}/{train.epochs} "
+            f"- loss: {train_loss:.4f} - accuracy: {train_acc:.4f} "
+            f"- val_loss: {val_loss:.4f} - val_accuracy: {val_acc:.4f}"
+        )
+
+    # avaliacao final no teste
+    model.eval()
+    test_loss = 0.0
+    test_correct = 0
+    test_total = 0
+
+    with torch.no_grad():
+        for inputs, labels in test_loader:
+            inputs = inputs.to(DEVICE)
+            labels = torch.tensor(labels).to(DEVICE) if not isinstance(labels, torch.Tensor) else labels.to(DEVICE)
+
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+
+            test_loss += loss.item() * inputs.size(0)
+            test_correct += (outputs.argmax(1) == labels).sum().item()
+            test_total += inputs.size(0)
+
+    accuracy = test_correct / test_total
+    loss_val = test_loss / test_total
 
     models_dir = "models"
     os.makedirs(models_dir, exist_ok=True)
-    model_path = os.path.join(models_dir, f"{train_id}.keras")
-    model.save(model_path)
+    model_path = os.path.join(models_dir, f"{train_id}.pt")
+    torch.save({
+        "model_state": model.state_dict(),
+        "architecture": experiment.architecture,
+        "num_classes": num_classes,
+    }, model_path)
 
     train.status = "ready"
     train.progress = 100
     train.accuracy = float(accuracy)
-    train.loss = float(loss)
+    train.loss = float(loss_val)
     train.model_path = model_path
     train.class_names = class_names
 
     db.commit()
     db.close()
 
+
+# ---------------------------------------------------------------------------
+# Predicao
+# ---------------------------------------------------------------------------
+
+def load_model_for_inference(model_path, architecture, num_classes):
+    checkpoint = torch.load(model_path, map_location=DEVICE)
+    model = build_model(architecture, num_classes)
+    model.load_state_dict(checkpoint["model_state"])
+    model.eval()
+    return model
+
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
 
 @app.post("/experiment")
 def create_experiment(params: ExperimentParams):
@@ -397,7 +525,7 @@ def download_model(train_id: str):
     return FileResponse(
         t.model_path,
         media_type="application/octet-stream",
-        filename=f"{train_id}.keras",
+        filename=f"{t.id}.pt",
     )
 
 
@@ -406,36 +534,31 @@ async def predict(train_id: str, file: UploadFile = File(...)):
     db = SessionLocal()
     t = db.query(Train).filter(Train.id == train_id).first()
     experiment = db.query(Experiment).filter(Experiment.id == t.experiment_id).first()
+    num_classes = len(t.class_names) if t.class_names else 2
     db.close()
 
     if not t or not t.model_path or not os.path.exists(t.model_path):
         return {"error": "model not found or not ready"}
 
-    is_transfer_learning = experiment.architecture in TRANSFER_LEARNING_MODELS
-    target_size = (224, 224) if is_transfer_learning else (28, 28)
+    model = load_model_for_inference(t.model_path, experiment.architecture, num_classes)
 
-    model = keras.models.load_model(t.model_path)
+    transform = make_transform(experiment.architecture)
 
     contents = await file.read()
-    image_array = np.array(
-        Image.open(io.BytesIO(contents)).convert("RGB").resize(target_size),
-        dtype="float32",
-    )
-    image_array = np.expand_dims(image_array, axis=0)
+    img = Image.open(io.BytesIO(contents)).convert("RGB")
+    tensor = transform(img).unsqueeze(0).to(DEVICE)
 
-    if is_transfer_learning:
-        image_array = PREPROCESS_FN[experiment.architecture](image_array)
-    else:
-        image_array = image_array / 255.0
+    with torch.no_grad():
+        outputs = model(tensor)
+        probabilities = torch.softmax(outputs, dim=1)[0]
 
-    prediction = model.predict(image_array, verbose=0)
-    predicted_class = int(np.argmax(prediction))
-    confidence = float(prediction[0][predicted_class])
+    predicted_class = int(probabilities.argmax().item())
+    confidence = float(probabilities[predicted_class].item())
 
     return {
         "predicted_class": predicted_class,
         "confidence": confidence,
-        "probabilities": prediction[0].tolist(),
+        "probabilities": probabilities.tolist(),
     }
 
 
@@ -455,7 +578,6 @@ async def upload_dataset(file: UploadFile = File(...), name: str = "Custom Datas
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
         zip_ref.extractall(extract_path)
 
-    # Se houver uma única pasta raiz, usa ela como base
     items = os.listdir(extract_path)
     base_path = extract_path
     if len(items) == 1:
@@ -463,7 +585,10 @@ async def upload_dataset(file: UploadFile = File(...), name: str = "Custom Datas
         if os.path.isdir(potential_base):
             base_path = potential_base
 
-    classes = [item for item in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, item))]
+    classes = sorted([
+        item for item in os.listdir(base_path)
+        if os.path.isdir(os.path.join(base_path, item))
+    ])
 
     if not classes:
         shutil.rmtree(dataset_path)
@@ -481,7 +606,6 @@ async def upload_dataset(file: UploadFile = File(...), name: str = "Custom Datas
         for img_file in os.listdir(class_src):
             if img_file.lower().endswith((".png", ".jpg", ".jpeg", ".bmp")):
                 try:
-                    # Força RGB para garantir 3 canais consistentes
                     img = Image.open(os.path.join(class_src, img_file)).convert("RGB")
                     img.save(os.path.join(class_dst, img_file))
                     num_images += 1
