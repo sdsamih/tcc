@@ -197,7 +197,32 @@ def build_model(architecture, num_classes):
 # Treinamento
 # ---------------------------------------------------------------------------
 
+def get_device_info():
+    if torch.cuda.is_available():
+        gpu_name = torch.cuda.get_device_name(0)
+        return f"GPU ({gpu_name})"
+    else:
+        cpu_model = "Desconhecido"
+        try:
+            with open("/proc/cpuinfo") as f:
+                for line in f:
+                    if line.startswith("model name"):
+                        cpu_model = line.split(":", 1)[1].strip()
+                        break
+        except Exception:
+            pass
+        return f"CPU ({cpu_model})"
+
 def real_training(train_id: str):
+    device_info = get_device_info()
+    print(f"{'='*60}")
+    print(f"Iniciando treino:  {train_id}")
+    print(f"Experimento:       {experiment.name}")
+    print(f"Arquitetura:       {experiment.architecture}")
+    print(f"Dispositivo:       {device_info}")
+    print(f"Epochs: {train.epochs}  |  LR: {train.learning_rate}  |  Batch: {train.batch_size}")
+    print(f"{'='*60}")
+
     db = SessionLocal()
 
     train = db.query(Train).filter(Train.id == train_id).first()
