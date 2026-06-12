@@ -31,6 +31,19 @@ export default function NovoExperimento() {
     }
   }, []);
 
+  const getArchitectureName = (architecture) => {
+    const architectureNames = {
+      "simple": "Simples (Dense)",
+      "cnn": "CNN",
+      "mobilenet": "MobileNet",
+      "resnet50": "ResNet50",
+      "inceptionv3": "InceptionV3",
+      "xception": "Xception",
+      "densenet121": "DenseNet121"
+    };
+    return architectureNames[architecture] || architecture;
+  };
+
   const fetchDatasets = async () => {
     try {
       const response = await fetch("http://127.0.0.1:8000/datasets");
@@ -210,6 +223,11 @@ export default function NovoExperimento() {
               >
                 <option value="simple">Simples (Dense)</option>
                 <option value="cnn">CNN (Recomendado para imagens)</option>
+                <option value="mobilenet">MobileNet (Transfer Learning)</option>
+                <option value="resnet50">ResNet50 (Transfer Learning)</option>
+                <option value="inceptionv3">InceptionV3 (Transfer Learning)</option>
+                <option value="xception">Xception (Transfer Learning)</option>
+                <option value="densenet121">DenseNet121 (Transfer Learning)</option>
               </select>
             </div>
 
@@ -232,7 +250,7 @@ export default function NovoExperimento() {
             <div className="bg-slate-50 rounded-lg p-4 mb-4">
               <p className="text-sm text-slate-600">
                 <strong>Experimento:</strong> {experimentName}<br/>
-                <strong>Arquitetura:</strong> {architecture === "simple" ? "Simples (Dense)" : "CNN"}<br/>
+                <strong>Arquitetura:</strong> {getArchitectureName(architecture)}<br/>
                 <strong>Dataset:</strong> {datasetId ? datasets.find(d => d.id === datasetId)?.name : "MNIST (padrão)"}
               </p>
             </div>

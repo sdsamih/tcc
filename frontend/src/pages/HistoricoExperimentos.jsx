@@ -5,6 +5,19 @@ import { Clock, FlaskConical, ArrowRight } from "lucide-react";
 export default function HistoricoExperimentos() {
   const [experiments, setExperiments] = useState([]);
 
+  const getArchitectureName = (architecture) => {
+    const architectureNames = {
+      "simple": "Dense",
+      "cnn": "CNN",
+      "mobilenet": "MobileNet",
+      "resnet50": "ResNet50",
+      "inceptionv3": "InceptionV3",
+      "xception": "Xception",
+      "densenet121": "DenseNet121"
+    };
+    return architectureNames[architecture] || architecture;
+  };
+
   useEffect(() => {
     fetch("http://127.0.0.1:8000/experiment")
       .then((res) => res.json())
@@ -39,7 +52,7 @@ export default function HistoricoExperimentos() {
                     <h3 className="font-medium text-slate-800">{experiment.name}</h3>
                     <div className="flex items-center gap-3 mt-1">
                       <span className="text-sm text-slate-500">
-                        {experiment.architecture === "simple" ? "Dense" : "CNN"}
+                        {getArchitectureName(experiment.architecture)}
                       </span>
                       <span className="text-sm text-slate-500">•</span>
                       <span className="text-sm text-slate-500">

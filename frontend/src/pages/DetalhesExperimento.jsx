@@ -198,6 +198,19 @@ export default function DetalhesExperimento() {
     return classIndex;
   };
 
+  const getArchitectureName = (architecture) => {
+    const architectureNames = {
+      "simple": "Dense",
+      "cnn": "CNN",
+      "mobilenet": "MobileNet",
+      "resnet50": "ResNet50",
+      "inceptionv3": "InceptionV3",
+      "xception": "Xception",
+      "densenet121": "DenseNet121"
+    };
+    return architectureNames[architecture] || architecture;
+  };
+
   const getStatusIcon = (status) => {
     switch (status) {
       case "ready":
@@ -232,7 +245,7 @@ export default function DetalhesExperimento() {
             <div>
               <h2 className="text-xl font-semibold text-slate-800">{experiment.name}</h2>
               <div className="flex items-center gap-2 mt-1 text-sm text-slate-500">
-                <span>{experiment.architecture === "simple" ? "Dense" : "CNN"}</span>
+                <span>{getArchitectureName(experiment.architecture)}</span>
                 <span>•</span>
                 <span>{experiment.created_at}</span>
                 <span>•</span>
