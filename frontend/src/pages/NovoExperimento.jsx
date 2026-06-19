@@ -27,8 +27,24 @@ export default function NovoExperimento() {
     const pendingExperimentId = localStorage.getItem('pendingExperimentId');
     if (pendingExperimentId) {
       console.log("Carregando experiment_id do localStorage:", pendingExperimentId);
-      setExperimentId(pendingExperimentId);
-      setStep(2);
+      // Verificar se o experimento ainda existe no backend
+      fetch(`http://127.0.0.1:8000/experiment/${pendingExperimentId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.error) {
+            // Experimento não existe mais, limpar localStorage
+            localStorage.removeItem('pendingExperimentId');
+            setStep(1);
+          } else {
+            setExperimentId(pendingExperimentId);
+            setStep(2);
+          }
+        })
+        .catch(() => {
+          // Erro ao verificar, limpar localStorage e começar do step 1
+          localStorage.removeItem('pendingExperimentId');
+          setStep(1);
+        });
     }
   }, []);
 
