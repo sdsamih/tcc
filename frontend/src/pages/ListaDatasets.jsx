@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { Database, Image as ImageIcon, Folder } from "lucide-react";
+import { Database, Image as ImageIcon, Folder, Edit, Trash2 } from "lucide-react";
 
 export default function ListaDatasets() {
   const [datasets, setDatasets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState(null);
+  const [editingName, setEditingName] = useState("");
 
   useEffect(() => {
     fetchDatasets();
@@ -18,6 +20,41 @@ export default function ListaDatasets() {
       console.error("Erro ao buscar datasets:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEdit = (dataset) => {
+    setEditingId(dataset.id);
+    setEditingName(dataset.name);
+  };
+
+  const handleSaveEdit = async (datasetId) => {
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/datasets/${datasetId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editingName }),
+      });
+      if (response.ok) {
+        setEditingId(null);
+        fetchDatasets();
+      }
+    } catch (error) {
+      console.error("Erro ao editar dataset:", error);
+    }
+  };
+
+  const handleDelete = async (datasetId) => {
+    if (!confirm("Tem certeza que deseja deletar este dataset?")) return;
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/datasets/${datasetId}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        fetchDatasets();
+      }
+    } catch (error) {
+      console.error("Erro ao deletar dataset:", error);
     }
   };
 
@@ -46,9 +83,51 @@ export default function ListaDatasets() {
                 <div className="flex items-center gap-3">
                   <Database className="text-slate-500" size={24} />
                   <div>
-                    <h3 className="font-semibold text-slate-800">{dataset.name}</h3>
+                    {editingId === dataset.id ? (
+                      <input
+                        type="text"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        className="font-semibold text-slate-800 border border-slate-300 rounded px-2 py-1"
+                      />
+                    ) : (
+                      <h3 className="font-semibold text-slate-800">{dataset.name}</h3>
+                    )}
                     <p className="text-sm text-slate-500">ID: {dataset.id}</p>
                   </div>
+                </div>
+                <div className="flex gap-2">
+                  {editingId === dataset.id ? (
+                    <>
+                      <button
+                        onClick={() => handleSaveEdit(dataset.id)}
+                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="p-2 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                      >
+                        ✗
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleEdit(dataset)}
+                        className="p-2 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                      >
+                        <Edit size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(dataset.id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 

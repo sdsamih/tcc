@@ -62,6 +62,10 @@ class ExperimentParams(BaseModel):
     architecture: str = "simple"
 
 
+class UpdateNameParams(BaseModel):
+    name: str
+
+
 # ---------------------------------------------------------------------------
 # Dataset
 # ---------------------------------------------------------------------------
@@ -509,6 +513,41 @@ def list_experiment_trains(experiment_id: str):
     return [_serialize_train(t) for t in trains]
 
 
+@app.put("/experiment/{experiment_id}")
+def update_experiment(experiment_id: str, params: UpdateNameParams):
+    db = SessionLocal()
+    experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
+    if not experiment:
+        db.close()
+        return {"error": "experiment not found"}
+    experiment.name = params.name
+    db.commit()
+    db.close()
+    return {"id": experiment_id, "name": params.name}
+
+
+@app.delete("/experiment/{experiment_id}")
+def delete_experiment(experiment_id: str):
+    db = SessionLocal()
+    experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
+    if not experiment:
+        db.close()
+        return {"error": "experiment not found"}
+
+    # Deletar todos os treinos associados
+    trains = db.query(Train).filter(Train.experiment_id == experiment_id).all()
+    for train in trains:
+        # Deletar arquivo do modelo se existir
+        if train.model_path and os.path.exists(train.model_path):
+            os.remove(train.model_path)
+        db.delete(train)
+
+    db.delete(experiment)
+    db.commit()
+    db.close()
+    return {"message": "experiment deleted"}
+
+
 @app.post("/experiment/{experiment_id}/train")
 def create_train_in_experiment(experiment_id: str, params: TrainParams, background_tasks: BackgroundTasks):
     db = SessionLocal()
@@ -558,6 +597,24 @@ def get_train(train_id: str):
         return {"error": "not found"}
 
     return _serialize_train(t, include_experiment=True)
+
+
+@app.delete("/train/{train_id}")
+def delete_train(train_id: str):
+    db = SessionLocal()
+    train = db.query(Train).filter(Train.id == train_id).first()
+    if not train:
+        db.close()
+        return {"error": "train not found"}
+
+    # Deletar arquivo do modelo se existir
+    if train.model_path and os.path.exists(train.model_path):
+        os.remove(train.model_path)
+
+    db.delete(train)
+    db.commit()
+    db.close()
+    return {"message": "train deleted"}
 
 
 @app.get("/train/{train_id}/download")
@@ -697,6 +754,37 @@ def list_datasets():
         }
         for d in datasets
     ]
+
+
+@app.put("/datasets/{dataset_id}")
+def update_dataset(dataset_id: str, params: UpdateNameParams):
+    db = SessionLocal()
+    dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
+    if not dataset:
+        db.close()
+        return {"error": "dataset not found"}
+    dataset.name = params.name
+    db.commit()
+    db.close()
+    return {"id": dataset_id, "name": params.name}
+
+
+@app.delete("/datasets/{dataset_id}")
+def delete_dataset(dataset_id: str):
+    db = SessionLocal()
+    dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
+    if not dataset:
+        db.close()
+        return {"error": "dataset not found"}
+
+    # Deletar arquivos do dataset
+    if os.path.exists(dataset.path):
+        shutil.rmtree(os.path.dirname(dataset.path))
+
+    db.delete(dataset)
+    db.commit()
+    db.close()
+    return {"message": "dataset deleted"}
 
 
 def _serialize_train(t, include_experiment=False):

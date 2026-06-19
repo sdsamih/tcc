@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Download, Upload, Image as ImageIcon, CheckCircle, Loader2, Clock, Settings, Target, Info, Plus, FlaskConical, Play } from "lucide-react";
+import { Download, Upload, Image as ImageIcon, CheckCircle, Loader2, Clock, Settings, Target, Info, Plus, FlaskConical, Play, Trash2 } from "lucide-react";
 import { Tooltip } from "react-tooltip";
 
 export default function DetalhesExperimento() {
@@ -192,6 +192,23 @@ export default function DetalhesExperimento() {
     }
   };
 
+  const handleDeleteTrain = async (trainId) => {
+    if (!confirm("Tem certeza que deseja deletar este treino?")) return;
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/train/${trainId}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        fetchExperiment();
+        if (selectedTrainId === trainId) {
+          setSelectedTrainId(null);
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao deletar treino:", error);
+    }
+  };
+
   const getClassName = (classIndex) => {
     if (selectedTrain && selectedTrain.class_names && selectedTrain.class_names[classIndex] !== undefined) {
       return selectedTrain.class_names[classIndex];
@@ -335,16 +352,18 @@ export default function DetalhesExperimento() {
           <h3 className="font-medium text-slate-800 mb-4">Treinos</h3>
           <div className="space-y-2">
             {experiment.trains.map((train) => (
-              <button
+              <div
                 key={train.id}
-                onClick={() => setSelectedTrainId(train.id)}
-                className={`w-full flex items-center justify-between p-4 rounded-lg border transition-colors duration-200 ${
+                className={`flex items-center justify-between p-4 rounded-lg border transition-colors duration-200 ${
                   selectedTrainId === train.id
                     ? "border-slate-900 bg-slate-50"
                     : "border-slate-200 hover:border-slate-400"
                 }`}
               >
-                <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setSelectedTrainId(train.id)}
+                  className="flex items-center gap-4 flex-1"
+                >
                   {getStatusIcon(train.status)}
                   <div className="text-left">
                     <p className="font-medium text-slate-800">Treino #{train.id.slice(0, 8)}</p>
@@ -356,7 +375,7 @@ export default function DetalhesExperimento() {
                       <span>Batch: {train.params.batch_size}</span>
                     </div>
                   </div>
-                </div>
+                </button>
                 <div className="flex items-center gap-4">
                   {train.status === "ready" && train.accuracy !== null && (
                     <span className="text-sm font-medium text-slate-800">
@@ -366,8 +385,17 @@ export default function DetalhesExperimento() {
                   <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(train.status)}`}>
                     {train.status}
                   </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteTrain(train.id);
+                    }}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    <Trash2 size={18} />
+                  </button>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         </div>

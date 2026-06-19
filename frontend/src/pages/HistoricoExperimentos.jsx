@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Clock, FlaskConical, ArrowRight } from "lucide-react";
+import { Clock, FlaskConical, ArrowRight, Edit, Trash2 } from "lucide-react";
 
 export default function HistoricoExperimentos() {
   const [experiments, setExperiments] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [editingName, setEditingName] = useState("");
 
   const getArchitectureName = (architecture) => {
     const architectureNames = {
@@ -29,6 +31,45 @@ export default function HistoricoExperimentos() {
       });
   }, []);
 
+  const handleEdit = (experiment) => {
+    setEditingId(experiment.id);
+    setEditingName(experiment.name);
+  };
+
+  const handleSaveEdit = async (experimentId) => {
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/experiment/${experimentId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editingName }),
+      });
+      if (response.ok) {
+        setEditingId(null);
+        fetch("http://127.0.0.1:8000/experiment")
+          .then((res) => res.json())
+          .then((data) => setExperiments(data));
+      }
+    } catch (error) {
+      console.error("Erro ao editar experimento:", error);
+    }
+  };
+
+  const handleDelete = async (experimentId) => {
+    if (!confirm("Tem certeza que deseja deletar este experimento e todos os seus treinos?")) return;
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/experiment/${experimentId}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        fetch("http://127.0.0.1:8000/experiment")
+          .then((res) => res.json())
+          .then((data) => setExperiments(data));
+      }
+    } catch (error) {
+      console.error("Erro ao deletar experimento:", error);
+    }
+  };
+
   return (
     <div>
       <h1 className="text-2xl font-semibold text-slate-800 mb-6">Histórico de Experimentos</h1>
@@ -49,7 +90,16 @@ export default function HistoricoExperimentos() {
                 <div className="flex items-center gap-4">
                   <FlaskConical className="text-slate-500" size={20} />
                   <div>
-                    <h3 className="font-medium text-slate-800">{experiment.name}</h3>
+                    {editingId === experiment.id ? (
+                      <input
+                        type="text"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        className="font-medium text-slate-800 border border-slate-300 rounded px-2 py-1"
+                      />
+                    ) : (
+                      <h3 className="font-medium text-slate-800">{experiment.name}</h3>
+                    )}
                     <div className="flex items-center gap-3 mt-1">
                       <span className="text-sm text-slate-500">
                         {getArchitectureName(experiment.architecture)}
@@ -65,12 +115,45 @@ export default function HistoricoExperimentos() {
                     </div>
                   </div>
                 </div>
-                <Link to={`/experimento/${experiment.id}`}>
-                  <button className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors duration-200">
-                    Ver detalhes
-                    <ArrowRight size={16} />
-                  </button>
-                </Link>
+                <div className="flex items-center gap-2">
+                  {editingId === experiment.id ? (
+                    <>
+                      <button
+                        onClick={() => handleSaveEdit(experiment.id)}
+                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="p-2 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                      >
+                        ✗
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleEdit(experiment)}
+                        className="p-2 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                      >
+                        <Edit size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(experiment.id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                      <Link to={`/experimento/${experiment.id}`}>
+                        <button className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors duration-200">
+                          Ver detalhes
+                          <ArrowRight size={16} />
+                        </button>
+                      </Link>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           ))}
