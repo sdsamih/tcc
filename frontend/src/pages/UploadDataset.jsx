@@ -21,13 +21,19 @@ export default function UploadDataset() {
       return;
     }
 
+    if (!name) {
+      setMessage("Por favor, insira um nome para o dataset");
+      return;
+    }
+
     setUploading(true);
     setUploadProgress(0);
     setMessage("");
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("name", name || "Custom Dataset");
+    formData.append("name", name);
+    console.log("Enviando dataset com nome:", name);
 
     // Simular progresso do upload
     const progressInterval = setInterval(() => {
