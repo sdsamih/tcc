@@ -15,6 +15,7 @@ export default function NovoExperimento() {
   const [epochs, setEpochs] = useState(10);
   const [learningRate, setLearningRate] = useState(0.001);
   const [batchSize, setBatchSize] = useState(32);
+  const [earlyStopping, setEarlyStopping] = useState(false);
   
   const [message, setMessage] = useState("");
 
@@ -116,6 +117,7 @@ export default function NovoExperimento() {
       epochs: Number(epochs),
       learning_rate: Number(learningRate),
       batch_size: Number(batchSize),
+      early_stopping: earlyStopping,
     };
 
     console.log("Payload a ser enviado:", payload);
@@ -308,6 +310,19 @@ export default function NovoExperimento() {
                 onChange={(e) => setBatchSize(e.target.value)}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none transition-all"
               />
+            </div>
+
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={earlyStopping}
+                  onChange={(e) => setEarlyStopping(e.target.checked)}
+                  className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
+                />
+                <span className="text-sm font-medium text-slate-700">Early Stopping</span>
+              </label>
+              <p className="text-xs text-slate-500 mt-1 ml-6">Para automaticamente quando a validação não melhora</p>
             </div>
 
             <button

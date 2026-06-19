@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Float, JSON, ForeignKey
+from sqlalchemy import Column, String, Integer, Float, Boolean, JSON, ForeignKey
 from .database import Base
 
 class Dataset(Base):
@@ -29,6 +29,7 @@ class Train(Base):
     epochs = Column(Integer)
     learning_rate = Column(Float)
     batch_size = Column(Integer)
+    early_stopping = Column(Boolean, default=False)
     
     status = Column(String)
     progress = Column(Integer)

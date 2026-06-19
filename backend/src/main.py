@@ -53,6 +53,7 @@ class TrainParams(BaseModel):
     batch_size: int
     experiment_id: str
     architecture: str = "simple"
+    early_stopping: bool = False
 
 
 class ExperimentParams(BaseModel):
@@ -214,6 +215,11 @@ def get_device_info():
         return f"CPU ({cpu_model})"
 
 def real_training(train_id: str):
+    db = SessionLocal()
+
+    train = db.query(Train).filter(Train.id == train_id).first()
+    experiment = db.query(Experiment).filter(Experiment.id == train.experiment_id).first()
+
     device_info = get_device_info()
     print(f"{'='*60}")
     print(f"Iniciando treino:  {train_id}")
@@ -222,11 +228,6 @@ def real_training(train_id: str):
     print(f"Dispositivo:       {device_info}")
     print(f"Epochs: {train.epochs}  |  LR: {train.learning_rate}  |  Batch: {train.batch_size}")
     print(f"{'='*60}")
-
-    db = SessionLocal()
-
-    train = db.query(Train).filter(Train.id == train_id).first()
-    experiment = db.query(Experiment).filter(Experiment.id == train.experiment_id).first()
 
     transform = make_transform(experiment.architecture)
 
@@ -304,7 +305,14 @@ def real_training(train_id: str):
         lr=train.learning_rate,
     )
 
-    for epoch in range(train.epochs):
+    # Early stopping setup
+    use_early_stopping = train.early_stopping
+    max_epochs = train.epochs
+    patience = 10
+    best_val_loss = float('inf')
+    epochs_no_improve = 0
+    
+    for epoch in range(max_epochs):
         # treino
         model.train()
         running_loss = 0.0
@@ -349,11 +357,24 @@ def real_training(train_id: str):
         val_loss /= val_total
         val_acc   = val_correct / val_total
 
+        # Early stopping check
+        if use_early_stopping:
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                epochs_no_improve = 0
+            else:
+                epochs_no_improve += 1
+                if epochs_no_improve >= patience:
+                    print(f"Early stopping triggered at epoch {epoch + 1}")
+                    break
+        
+        # Update progress
         train.progress = int(((epoch + 1) / train.epochs) * 100)
         db.commit()
 
+        epoch_display = f"{epoch + 1}/{train.epochs}"
         print(
-            f"Epoch {epoch + 1}/{train.epochs} "
+            f"Epoch {epoch_display} "
             f"- loss: {train_loss:.4f} - accuracy: {train_acc:.4f} "
             f"- val_loss: {val_loss:.4f} - val_accuracy: {val_acc:.4f}"
         )
@@ -505,6 +526,7 @@ def create_train_in_experiment(experiment_id: str, params: TrainParams, backgrou
         epochs=params.epochs,
         learning_rate=params.learning_rate,
         batch_size=params.batch_size,
+        early_stopping=params.early_stopping,
         status="training",
         progress=0,
     )

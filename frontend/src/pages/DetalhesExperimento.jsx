@@ -11,7 +11,7 @@ export default function DetalhesExperimento() {
   const [prediction, setPrediction] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [showRetrainForm, setShowRetrainForm] = useState(false);
-  const [retrainParams, setRetrainParams] = useState({ epochs: 10, learning_rate: 0.001, batch_size: 32 });
+  const [retrainParams, setRetrainParams] = useState({ epochs: 10, learning_rate: 0.001, batch_size: 32, early_stopping: false });
 
   useEffect(() => {
     fetchExperiment();
@@ -166,6 +166,7 @@ export default function DetalhesExperimento() {
       epochs: Number(retrainParams.epochs),
       learning_rate: Number(retrainParams.learning_rate),
       batch_size: Number(retrainParams.batch_size),
+      early_stopping: retrainParams.early_stopping,
     };
 
     try {
@@ -295,6 +296,18 @@ export default function DetalhesExperimento() {
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none"
                 />
               </div>
+            </div>
+            <div className="mb-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={retrainParams.early_stopping}
+                  onChange={(e) => setRetrainParams({...retrainParams, early_stopping: e.target.checked})}
+                  className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
+                />
+                <span className="text-sm font-medium text-slate-700">Early Stopping</span>
+              </label>
+              <p className="text-xs text-slate-500 mt-1 ml-6">Para automaticamente quando a validação não melhora</p>
             </div>
             <div className="flex gap-2">
               <button
