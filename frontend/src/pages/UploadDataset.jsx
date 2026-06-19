@@ -132,7 +132,6 @@ export default function UploadDataset() {
 │   └── ...
 └── ...`}
             </pre>
-            <p className="text-sm text-slate-500">As imagens serão redimensionadas automaticamente para 28x28 pixels.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="max-w-2xl">

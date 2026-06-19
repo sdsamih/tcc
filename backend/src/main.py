@@ -1,4 +1,4 @@
-from fastapi import FastAPI, BackgroundTasks, UploadFile, File
+from fastapi import FastAPI, BackgroundTasks, UploadFile, File, Form
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -610,7 +610,7 @@ async def predict(train_id: str, file: UploadFile = File(...)):
 
 
 @app.post("/datasets/upload")
-async def upload_dataset(file: UploadFile = File(...), name: str = "Custom Dataset"):
+async def upload_dataset(file: UploadFile = File(...), name: str = Form("Custom Dataset")):
     dataset_id = str(uuid.uuid4())
     dataset_path = os.path.join("datasets", dataset_id)
     os.makedirs(dataset_path, exist_ok=True)
