@@ -476,7 +476,7 @@ export default function DetalhesExperimento() {
                   <Settings className="text-slate-500" size={20} />
                   <h3 className="font-medium text-slate-800">Métricas</h3>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 mb-4">
                   <div className="bg-slate-50 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-sm text-slate-500">Accuracy</p>
@@ -511,6 +511,76 @@ export default function DetalhesExperimento() {
                   Baixar Modelo
                 </button>
               </div>
+
+              {/* Métricas por classe */}
+              {selectedTrain.precision && selectedTrain.recall && selectedTrain.f1_score && (
+                <div className="bg-white rounded-lg border border-slate-200 p-6 mb-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <Target className="text-slate-500" size={20} />
+                    <h3 className="font-medium text-slate-800">Métricas por Classe</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-slate-200">
+                          <th className="text-left py-2 px-3 text-sm font-medium text-slate-600">Classe</th>
+                          <th className="text-left py-2 px-3 text-sm font-medium text-slate-600">Precision</th>
+                          <th className="text-left py-2 px-3 text-sm font-medium text-slate-600">Recall</th>
+                          <th className="text-left py-2 px-3 text-sm font-medium text-slate-600">F1-Score</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedTrain.class_names && selectedTrain.class_names.map((className, index) => (
+                          <tr key={index} className="border-b border-slate-100">
+                            <td className="py-2 px-3 text-sm text-slate-800">{className}</td>
+                            <td className="py-2 px-3 text-sm text-slate-800">{selectedTrain.precision[index]?.toFixed(4)}</td>
+                            <td className="py-2 px-3 text-sm text-slate-800">{selectedTrain.recall[index]?.toFixed(4)}</td>
+                            <td className="py-2 px-3 text-sm text-slate-800">{selectedTrain.f1_score[index]?.toFixed(4)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Matriz de Confusão */}
+              {selectedTrain.confusion_matrix && (
+                <div className="bg-white rounded-lg border border-slate-200 p-6 mb-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <Target className="text-slate-500" size={20} />
+                    <h3 className="font-medium text-slate-800">Matriz de Confusão</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-slate-200">
+                          <th className="py-2 px-3 text-sm font-medium text-slate-600"></th>
+                          {selectedTrain.class_names && selectedTrain.class_names.map((className, index) => (
+                            <th key={index} className="py-2 px-3 text-sm font-medium text-slate-600 text-center">
+                              {className}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedTrain.confusion_matrix.map((row, rowIndex) => (
+                          <tr key={rowIndex} className="border-b border-slate-100">
+                            <td className="py-2 px-3 text-sm font-medium text-slate-600">
+                              {selectedTrain.class_names && selectedTrain.class_names[rowIndex]}
+                            </td>
+                            {row.map((value, colIndex) => (
+                              <td key={colIndex} className="py-2 px-3 text-sm text-slate-800 text-center">
+                                {value}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               {selectedTrain.class_names && (
                 <div className="bg-white rounded-lg border border-slate-200 p-6 mb-6">

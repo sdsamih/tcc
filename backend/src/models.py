@@ -38,3 +38,9 @@ class Train(Base):
     loss = Column(Float, nullable=True)
     model_path = Column(String, nullable=True)
     class_names = Column(JSON, nullable=True)
+    
+    # Additional metrics
+    precision = Column(JSON, nullable=True)  # List of precision values per class
+    recall = Column(JSON, nullable=True)  # List of recall values per class
+    f1_score = Column(JSON, nullable=True)  # List of f1-score values per class
+    confusion_matrix = Column(JSON, nullable=True)  # 2D array representing confusion matrix

@@ -11,6 +11,7 @@ from PIL import Image
 import numpy as np
 import io
 import logging
+from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
 
 from src.database import engine
 from src.models import Base
@@ -388,6 +389,10 @@ def real_training(train_id: str):
     test_loss = 0.0
     test_correct = 0
     test_total = 0
+    
+    # Coletar predicoes e labels para calcular metricas adicionais
+    all_predictions = []
+    all_labels = []
 
     with torch.no_grad():
         for inputs, labels in test_loader:
@@ -400,9 +405,25 @@ def real_training(train_id: str):
             test_loss += loss.item() * inputs.size(0)
             test_correct += (outputs.argmax(1) == labels).sum().item()
             test_total += inputs.size(0)
+            
+            # Coletar predicoes e labels
+            all_predictions.extend(outputs.argmax(1).cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
 
     accuracy = test_correct / test_total
     loss_val = test_loss / test_total
+    
+    # Calcular metricas adicionais
+    all_predictions = np.array(all_predictions)
+    all_labels = np.array(all_labels)
+    
+    # Precision, Recall, F1-score (por classe)
+    precision = precision_score(all_labels, all_predictions, average=None, zero_division=0).tolist()
+    recall = recall_score(all_labels, all_predictions, average=None, zero_division=0).tolist()
+    f1 = f1_score(all_labels, all_predictions, average=None, zero_division=0).tolist()
+    
+    # Matriz de confusao
+    conf_matrix = confusion_matrix(all_labels, all_predictions).tolist()
 
     models_dir = "models"
     os.makedirs(models_dir, exist_ok=True)
@@ -419,6 +440,10 @@ def real_training(train_id: str):
     train.loss = float(loss_val)
     train.model_path = model_path
     train.class_names = class_names
+    train.precision = precision
+    train.recall = recall
+    train.f1_score = f1
+    train.confusion_matrix = conf_matrix
 
     db.commit()
     db.close()
@@ -805,6 +830,10 @@ def _serialize_train(t, include_experiment=False):
         "loss": t.loss,
         "model_path": t.model_path,
         "class_names": t.class_names,
+        "precision": t.precision,
+        "recall": t.recall,
+        "f1_score": t.f1_score,
+        "confusion_matrix": t.confusion_matrix,
     }
     if include_experiment:
         data["experiment_id"] = t.experiment_id
