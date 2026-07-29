@@ -524,9 +524,39 @@ export default function DetalhesExperimento() {
                       <thead>
                         <tr className="border-b border-slate-200">
                           <th className="text-left py-2 px-3 text-sm font-medium text-slate-600">Classe</th>
-                          <th className="text-left py-2 px-3 text-sm font-medium text-slate-600">Precision</th>
-                          <th className="text-left py-2 px-3 text-sm font-medium text-slate-600">Recall</th>
-                          <th className="text-left py-2 px-3 text-sm font-medium text-slate-600">F1-Score</th>
+                          <th className="text-left py-2 px-3 text-sm font-medium text-slate-600">
+                            <div className="flex items-center gap-2">
+                              Precision
+                              <Info 
+                                size={14} 
+                                className="text-slate-400 cursor-help" 
+                                data-tooltip-id="precision-tooltip"
+                                data-tooltip-place="top"
+                              />
+                            </div>
+                          </th>
+                          <th className="text-left py-2 px-3 text-sm font-medium text-slate-600">
+                            <div className="flex items-center gap-2">
+                              Recall
+                              <Info 
+                                size={14} 
+                                className="text-slate-400 cursor-help" 
+                                data-tooltip-id="recall-tooltip"
+                                data-tooltip-place="top"
+                              />
+                            </div>
+                          </th>
+                          <th className="text-left py-2 px-3 text-sm font-medium text-slate-600">
+                            <div className="flex items-center gap-2">
+                              F1-Score
+                              <Info 
+                                size={14} 
+                                className="text-slate-400 cursor-help" 
+                                data-tooltip-id="f1score-tooltip"
+                                data-tooltip-place="top"
+                              />
+                            </div>
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -549,7 +579,15 @@ export default function DetalhesExperimento() {
                 <div className="bg-white rounded-lg border border-slate-200 p-6 mb-6">
                   <div className="flex items-center gap-3 mb-4">
                     <Target className="text-slate-500" size={20} />
-                    <h3 className="font-medium text-slate-800">Matriz de Confusão</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium text-slate-800">Matriz de Confusão</h3>
+                      <Info 
+                        size={14} 
+                        className="text-slate-400 cursor-help" 
+                        data-tooltip-id="confusionmatrix-tooltip"
+                        data-tooltip-place="top"
+                      />
+                    </div>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full">
@@ -705,7 +743,35 @@ export default function DetalhesExperimento() {
         <div className="text-sm">
           <p className="font-semibold mb-2">O que é:</p>
           <p className="mb-3">Erro do modelo. Valores mais baixos indicam melhor ajuste aos dados.</p>
-        </div>Drop
+        </div>
+      </Tooltip>
+
+      <Tooltip id="precision-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que é:</p>
+          <p className="mb-3">Proporção de predições positivas corretas (TP / (TP + FP)). Valores mais altos indicam menos falsos positivos.</p>
+        </div>
+      </Tooltip>
+
+      <Tooltip id="recall-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que é:</p>
+          <p className="mb-3">Proporção de positivos reais identificados corretamente (TP / (TP + FN)). Valores mais altos indicam menos falsos negativos.</p>
+        </div>
+      </Tooltip>
+
+      <Tooltip id="f1score-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que é:</p>
+          <p className="mb-3">Média harmônica entre precision e recall (2 * (precision * recall) / (precision + recall)). Balanceia ambas as métricas em um único valor.</p>
+        </div>
+      </Tooltip>
+
+      <Tooltip id="confusionmatrix-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que é:</p>
+          <p className="mb-3">Tabela que mostra as predições do modelo vs. os valores reais. Cada célula (i,j) indica quantas amostras da classe i foram preditas como classe j. A diagonal principal mostra acertos.</p>
+        </div>
       </Tooltip>
     </div>
   );
