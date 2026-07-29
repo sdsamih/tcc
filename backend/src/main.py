@@ -24,6 +24,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset as TorchDataset, DataLoader
 import torchvision.transforms as transforms
 import torchvision.models as models
+import timm
 
 app = FastAPI()
 
@@ -151,12 +152,12 @@ def build_model(architecture, num_classes):
         model.aux_logits = False
 
     elif architecture == "xception":
-        # torchvision nao tem Xception; usa EfficientNet-B0 como substituto equivalente
-        model = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.IMAGENET1K_V1)
+        # Xception do timm
+        model = timm.create_model('xception', pretrained=True, num_classes=0)
         for p in model.parameters():
             p.requires_grad = False
-        in_features = model.classifier[1].in_features
-        model.classifier = nn.Sequential(
+        in_features = model.num_features
+        model.fc = nn.Sequential(
             nn.Dropout(0.2),
             nn.Linear(in_features, 128),
             nn.ReLU(),
