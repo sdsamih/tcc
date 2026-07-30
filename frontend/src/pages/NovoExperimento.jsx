@@ -16,6 +16,7 @@ export default function NovoExperimento() {
   const [learningRate, setLearningRate] = useState(0.001);
   const [batchSize, setBatchSize] = useState(32);
   const [earlyStopping, setEarlyStopping] = useState(false);
+  const [dataAugmentation, setDataAugmentation] = useState(false);
   
   const [message, setMessage] = useState("");
 
@@ -134,6 +135,7 @@ export default function NovoExperimento() {
       learning_rate: Number(learningRate),
       batch_size: Number(batchSize),
       early_stopping: earlyStopping,
+      data_augmentation: dataAugmentation,
     };
 
     console.log("Payload a ser enviado:", payload);
@@ -337,8 +339,33 @@ export default function NovoExperimento() {
                   className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
                 />
                 <span className="text-sm font-medium text-slate-700">Early Stopping</span>
+                <Info 
+                  size={16} 
+                  className="text-slate-400 cursor-help" 
+                  data-tooltip-id="earlystopping-tooltip"
+                  data-tooltip-place="right"
+                />
               </label>
               <p className="text-xs text-slate-500 mt-1 ml-6">Para automaticamente quando a validação não melhora</p>
+            </div>
+
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={dataAugmentation}
+                  onChange={(e) => setDataAugmentation(e.target.checked)}
+                  className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
+                />
+                <span className="text-sm font-medium text-slate-700">Data Augmentation</span>
+                <Info 
+                  size={16} 
+                  className="text-slate-400 cursor-help" 
+                  data-tooltip-id="dataaugmentation-tooltip"
+                  data-tooltip-place="right"
+                />
+              </label>
+              <p className="text-xs text-slate-500 mt-1 ml-6">Aumenta diversidade do dataset com transformações artificiais</p>
             </div>
 
             <button
@@ -417,6 +444,39 @@ export default function NovoExperimento() {
           <p className="font-semibold mb-2">Recomendação:</p>
           <p className="text-green-600">✓ Use CNN para imagens (melhor desempenho)</p>
           <p className="text-slate-500">• Use Dense apenas para testes rápidos ou datasets muito simples</p>
+        </div>
+      </Tooltip>
+
+      <Tooltip id="dataaugmentation-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que é:</p>
+          <p className="mb-3">Aumenta artificialmente a diversidade do dataset aplicando transformações nas imagens de treino.</p>
+          <p className="font-semibold mb-2">Operações aplicadas:</p>
+          <p className="mb-2"><strong>Modelos de Transfer Learning (224x224):</strong></p>
+          <ul className="list-disc pl-5 mb-3">
+            <li>RandomResizedCrop: Crop aleatório com resize (escala 0.8-1.0)</li>
+            <li>RandomHorizontalFlip: Espelhamento horizontal (50% probabilidade)</li>
+            <li>RandomRotation: Rotação aleatória (±15 graus)</li>
+            <li>ColorJitter: Variação de brilho, contraste e saturação (±20%)</li>
+          </ul>
+          <p className="mb-2"><strong>Modelos Simples (28x28):</strong></p>
+          <ul className="list-disc pl-5 mb-3">
+            <li>RandomHorizontalFlip: Espelhamento horizontal (50% probabilidade)</li>
+            <li>RandomRotation: Rotação aleatória (±10 graus)</li>
+          </ul>
+          <p className="font-semibold mb-2">Importante:</p>
+          <p className="mb-3">Data augmentation é aplicado apenas no conjunto de treino. Teste e validação não recebem essas transformações.</p>
+        </div>
+      </Tooltip>
+
+      <Tooltip id="earlystopping-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que é:</p>
+          <p className="mb-3">Para automaticamente o treinamento quando a loss de validação não melhora por várias épocas consecutivas.</p>
+          <p className="font-semibold mb-2">Benefícios:</p>
+          <p className="text-green-600 mb-1">✓ Evita overfitting para no momento ideal</p>
+          <p className="text-green-600 mb-1">✓ Economiza tempo de treinamento</p>
+          <p className="text-green-600">✓ Previne treinamento excessivo</p>
         </div>
       </Tooltip>
     </div>

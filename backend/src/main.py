@@ -56,6 +56,7 @@ class TrainParams(BaseModel):
     experiment_id: str
     architecture: str = "simple"
     early_stopping: bool = False
+    data_augmentation: bool = False
 
 
 class ExperimentParams(BaseModel):
@@ -96,8 +97,42 @@ class ImageFileDataset(TorchDataset):
         return self.transform(img), label
 
 
-def make_transform(architecture):
-    """Retorna o transform correto para cada arquitetura."""
+def make_train_transform(architecture, data_augmentation=False):
+    """Retorna o transform de treino correto para cada arquitetura com data augmentation opcional."""
+    if architecture in TRANSFER_LEARNING_MODELS:
+        size = 224
+        if data_augmentation:
+            return transforms.Compose([
+                transforms.RandomResizedCrop(size, scale=(0.8, 1.0)),
+                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.RandomRotation(degrees=15),
+                transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+            ])
+        else:
+            return transforms.Compose([
+                transforms.Resize((size, size)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+            ])
+    else:
+        if data_augmentation:
+            return transforms.Compose([
+                transforms.Resize((28, 28)),
+                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.RandomRotation(degrees=10),
+                transforms.ToTensor(),
+            ])
+        else:
+            return transforms.Compose([
+                transforms.Resize((28, 28)),
+                transforms.ToTensor(),
+            ])
+
+
+def make_test_transform(architecture):
+    """Retorna o transform de teste correto para cada arquitetura (sem augmentation)."""
     if architecture in TRANSFER_LEARNING_MODELS:
         size = 224
         return transforms.Compose([
@@ -108,7 +143,7 @@ def make_transform(architecture):
     else:
         return transforms.Compose([
             transforms.Resize((28, 28)),
-            transforms.ToTensor(),  # já normaliza para [0, 1]
+            transforms.ToTensor(),
         ])
 
 
@@ -233,9 +268,11 @@ def real_training(train_id: str):
     print(f"Arquitetura:       {experiment.architecture}")
     print(f"Dispositivo:       {device_info}")
     print(f"Epochs: {train.epochs}  |  LR: {train.learning_rate}  |  Batch: {train.batch_size}")
+    print(f"Data Augmentation: {train.data_augmentation}")
     print(f"{'='*60}")
 
-    transform = make_transform(experiment.architecture)
+    train_transform = make_train_transform(experiment.architecture, train.data_augmentation)
+    test_transform = make_test_transform(experiment.architecture)
 
     if experiment.dataset_id:
         dataset = db.query(Dataset).filter(Dataset.id == experiment.dataset_id).first()
@@ -269,8 +306,19 @@ def real_training(train_id: str):
     if experiment.dataset_id:
         np.random.shuffle(all_samples)
         n = len(all_samples)
-        test_split = int(n * 0.2)
-        val_split  = int((n - test_split) * 0.1)
+        
+        # Sistema adaptativo de split para datasets pequenos
+        if n < 100:
+            # Para datasets muito pequenos, usar split mais conservador
+            # Mínimo de 1 amostra por split, tentando manter alguma representatividade
+            min_per_split = max(1, n // 10)  # Mínimo 1, mas idealmente 10% por split
+            test_split = min_per_split
+            val_split = min_per_split
+            print(f"⚠️  Dataset pequeno ({n} imagens). Usando split conservador para validação/teste.")
+        else:
+            # Para datasets normais, usar split padrão
+            test_split = int(n * 0.2)
+            val_split  = int((n - test_split) * 0.1)
 
         test_samples = all_samples[:test_split]
         val_samples  = all_samples[test_split:test_split + val_split]
@@ -285,20 +333,20 @@ def real_training(train_id: str):
     print(f"Classes: {class_names}, device: {DEVICE}")
 
     train_loader = DataLoader(
-        ImageFileDataset(fit_samples, transform),
+        ImageFileDataset(fit_samples, train_transform),
         batch_size=train.batch_size,
         shuffle=True,
         num_workers=0,
         pin_memory=False,
     )
     val_loader = DataLoader(
-        ImageFileDataset(val_samples, transform),
+        ImageFileDataset(val_samples, test_transform),
         batch_size=train.batch_size,
         shuffle=False,
         num_workers=0,
     )
     test_loader = DataLoader(
-        ImageFileDataset(test_samples, transform),
+        ImageFileDataset(test_samples, test_transform),
         batch_size=train.batch_size,
         shuffle=False,
         num_workers=0,
@@ -592,6 +640,7 @@ def create_train_in_experiment(experiment_id: str, params: TrainParams, backgrou
         learning_rate=params.learning_rate,
         batch_size=params.batch_size,
         early_stopping=params.early_stopping,
+        data_augmentation=params.data_augmentation,
         status="training",
         progress=0,
     )
@@ -826,6 +875,8 @@ def _serialize_train(t, include_experiment=False):
             "epochs": t.epochs,
             "learning_rate": t.learning_rate,
             "batch_size": t.batch_size,
+            "early_stopping": t.early_stopping,
+            "data_augmentation": t.data_augmentation,
         },
         "accuracy": t.accuracy,
         "loss": t.loss,

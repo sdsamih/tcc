@@ -11,7 +11,7 @@ export default function DetalhesExperimento() {
   const [prediction, setPrediction] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [showRetrainForm, setShowRetrainForm] = useState(false);
-  const [retrainParams, setRetrainParams] = useState({ epochs: 10, learning_rate: 0.001, batch_size: 32, early_stopping: false });
+  const [retrainParams, setRetrainParams] = useState({ epochs: 10, learning_rate: 0.001, batch_size: 32, early_stopping: false, data_augmentation: false });
 
   useEffect(() => {
     fetchExperiment();
@@ -167,6 +167,7 @@ export default function DetalhesExperimento() {
       learning_rate: Number(retrainParams.learning_rate),
       batch_size: Number(retrainParams.batch_size),
       early_stopping: retrainParams.early_stopping,
+      data_augmentation: retrainParams.data_augmentation,
     };
 
     try {
@@ -326,6 +327,24 @@ export default function DetalhesExperimento() {
               </label>
               <p className="text-xs text-slate-500 mt-1 ml-6">Para automaticamente quando a validação não melhora</p>
             </div>
+            <div className="mb-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={retrainParams.data_augmentation}
+                  onChange={(e) => setRetrainParams({...retrainParams, data_augmentation: e.target.checked})}
+                  className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
+                />
+                <span className="text-sm font-medium text-slate-700">Data Augmentation</span>
+                <Info 
+                  size={14} 
+                  className="text-slate-400 cursor-help" 
+                  data-tooltip-id="dataaugmentation-tooltip"
+                  data-tooltip-place="tope"
+                />
+              </label>
+              <p className="text-xs text-slate-500 mt-1 ml-6">Aumenta diversidade do dataset com transformações artificiais</p>
+            </div>
             <div className="flex gap-2">
               <button
                 type="submit"
@@ -373,6 +392,14 @@ export default function DetalhesExperimento() {
                       <span>LR: {train.params.learning_rate}</span>
                       <span>•</span>
                       <span>Batch: {train.params.batch_size}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      {train.params.early_stopping && (
+                        <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">Early Stopping</span>
+                      )}
+                      {train.params.data_augmentation && (
+                        <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Data Augmentation</span>
+                      )}
                     </div>
                   </div>
                 </button>
@@ -465,6 +492,32 @@ export default function DetalhesExperimento() {
                   />
                 </div>
                 <p className="text-lg font-semibold text-slate-800">{selectedTrain.params.batch_size}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="bg-slate-50 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-sm text-slate-500">Early Stopping</p>
+                  <Info 
+                    size={14} 
+                    className="text-slate-400 cursor-help" 
+                    data-tooltip-id="earlystopping-tooltip"
+                    data-tooltip-place="top"
+                  />
+                </div>
+                <p className="text-lg font-semibold text-slate-800">{selectedTrain.params.early_stopping ? "Ativado" : "Desativado"}</p>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-sm text-slate-500">Data Augmentation</p>
+                  <Info 
+                    size={14} 
+                    className="text-slate-400 cursor-help" 
+                    data-tooltip-id="dataaugmentation-tooltip"
+                    data-tooltip-place="top"
+                  />
+                </div>
+                <p className="text-lg font-semibold text-slate-800">{selectedTrain.params.data_augmentation ? "Ativado" : "Desativado"}</p>
               </div>
             </div>
           </div>
@@ -771,6 +824,39 @@ export default function DetalhesExperimento() {
         <div className="text-sm">
           <p className="font-semibold mb-2">O que é:</p>
           <p className="mb-3">Tabela que mostra as predições do modelo vs. os valores reais. Cada célula (i,j) indica quantas amostras da classe i foram preditas como classe j. A diagonal principal mostra acertos.</p>
+        </div>
+      </Tooltip>
+
+      <Tooltip id="dataaugmentation-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que é:</p>
+          <p className="mb-3">Aumenta artificialmente a diversidade do dataset aplicando transformações nas imagens de treino.</p>
+          <p className="font-semibold mb-2">Operações aplicadas:</p>
+          <p className="mb-2"><strong>Modelos de Transfer Learning (224x224):</strong></p>
+          <ul className="list-disc pl-5 mb-3">
+            <li>RandomResizedCrop: Crop aleatório com resize (escala 0.8-1.0)</li>
+            <li>RandomHorizontalFlip: Espelhamento horizontal (50% probabilidade)</li>
+            <li>RandomRotation: Rotação aleatória (±15 graus)</li>
+            <li>ColorJitter: Variação de brilho, contraste e saturação (±20%)</li>
+          </ul>
+          <p className="mb-2"><strong>Modelos Simples (28x28):</strong></p>
+          <ul className="list-disc pl-5 mb-3">
+            <li>RandomHorizontalFlip: Espelhamento horizontal (50% probabilidade)</li>
+            <li>RandomRotation: Rotação aleatória (±10 graus)</li>
+          </ul>
+          <p className="font-semibold mb-2">Importante:</p>
+          <p className="mb-3">Data augmentation é aplicado apenas no conjunto de treino. Teste e validação não recebem essas transformações.</p>
+        </div>
+      </Tooltip>
+
+      <Tooltip id="earlystopping-tooltip">
+        <div className="text-sm">
+          <p className="font-semibold mb-2">O que é:</p>
+          <p className="mb-3">Para automaticamente o treinamento quando a loss de validação não melhora por várias épocas consecutivas.</p>
+          <p className="font-semibold mb-2">Benefícios:</p>
+          <p className="text-green-600 mb-1">✓ Evita overfitting para no momento ideal</p>
+          <p className="text-green-600 mb-1">✓ Economiza tempo de treinamento</p>
+          <p className="text-green-600">✓ Previne treinamento excessivo</p>
         </div>
       </Tooltip>
     </div>

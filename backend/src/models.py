@@ -30,6 +30,7 @@ class Train(Base):
     learning_rate = Column(Float)
     batch_size = Column(Integer)
     early_stopping = Column(Boolean, default=False)
+    data_augmentation = Column(Boolean, default=False)
     
     status = Column(String)
     progress = Column(Integer)
