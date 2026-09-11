@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tcc-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - FRONTEND_URL=http://localhost
+    volumes:
+      - backend-data:/app/models
+      - backend-db:/app/src
+    restart: unless-stopped
+    networks:
+      - tcc-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://backend:8000
+    container_name: tcc-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - tcc-network
+
+volumes:
+  backend-data:
+  backend-db:
+
+networks:
+  tcc-network:
+    driver: bridge

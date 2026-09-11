@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { UserPlus, User, Lock, AlertCircle, Info } from "lucide-react";
+import { apiPost } from "../utils/api";
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -27,41 +28,20 @@ export default function Register() {
     setLoading(true);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+      const data = await apiPost("/register", formData);
+
+      // Após registro bem-sucedido, fazer login automaticamente
+      const loginData = await apiPost("/login", {
+        username: formData.username,
+        password: formData.password,
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        // Após registro bem-sucedido, fazer login automaticamente
-        const loginResponse = await fetch("http://127.0.0.1:8000/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            username: formData.username, 
-            password: formData.password 
-          }),
-        });
-
-        const loginData = await loginResponse.json();
-
-        if (loginResponse.ok) {
-          localStorage.setItem("token", loginData.access_token);
-          localStorage.setItem("user_id", loginData.user_id);
-          localStorage.setItem("username", loginData.username);
-          navigate("/");
-        } else {
-          // Se o login automático falhar, redirecionar para login
-          navigate("/login");
-        }
-      } else {
-        setError(data.detail || "Erro ao criar conta");
-      }
+      localStorage.setItem("token", loginData.access_token);
+      localStorage.setItem("user_id", loginData.user_id);
+      localStorage.setItem("username", loginData.username);
+      navigate("/");
     } catch (err) {
-      setError("Erro de conexão com o servidor");
+      setError(err.message || "Erro ao criar conta");
     } finally {
       setLoading(false);
     }

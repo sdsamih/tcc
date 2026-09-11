@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { LogIn, User, Lock, AlertCircle } from "lucide-react";
+import { apiPost } from "../utils/api";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -15,25 +16,15 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
+      const data = await apiPost("/login", { username, password });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        // Salvar token e informações do usuário no localStorage
-        localStorage.setItem("token", data.access_token);
-        localStorage.setItem("user_id", data.user_id);
-        localStorage.setItem("username", data.username);
-        navigate("/");
-      } else {
-        setError(data.detail || "Erro ao fazer login");
-      }
+      // Salvar token e informações do usuário no localStorage
+      localStorage.setItem("token", data.access_token);
+      localStorage.setItem("user_id", data.user_id);
+      localStorage.setItem("username", data.username);
+      navigate("/");
     } catch (err) {
-      setError("Erro de conexão com o servidor");
+      setError(err.message || "Erro ao fazer login");
     } finally {
       setLoading(false);
     }
