@@ -2,6 +2,33 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Upload, FileArchive, Info, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Database, Loader2 } from "lucide-react";
 
+// Helper function for authenticated file upload
+async function uploadWithAuth(url, formData) {
+  const token = localStorage.getItem("token");
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`
+    },
+    body: formData,
+  });
+
+  if (response.status === 401) {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user_id");
+    localStorage.removeItem("username");
+    window.location.href = "/login";
+    throw new Error("Sessão expirada");
+  }
+
+  if (response.status === 403) {
+    window.location.href = "/";
+    throw new Error("Acesso negado");
+  }
+
+  return response;
+}
+
 export default function UploadDataset() {
   const [file, setFile] = useState(null);
   const [name, setName] = useState("");
@@ -44,10 +71,7 @@ export default function UploadDataset() {
     }, 200);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/datasets/upload", {
-        method: "POST",
-        body: formData,
-      });
+      const response = await uploadWithAuth("http://127.0.0.1:8000/datasets/upload", formData);
 
       clearInterval(progressInterval);
       setUploadProgress(100);

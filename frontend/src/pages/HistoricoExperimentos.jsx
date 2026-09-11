@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Clock, FlaskConical, ArrowRight, Edit, Trash2 } from "lucide-react";
+import { apiGet, apiPut, apiDelete } from "../utils/api";
 
 export default function HistoricoExperimentos() {
   const [experiments, setExperiments] = useState([]);
@@ -21,8 +22,7 @@ export default function HistoricoExperimentos() {
   };
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/experiment")
-      .then((res) => res.json())
+    apiGet("/experiment")
       .then((data) => {
         setExperiments(data);
       })
@@ -38,17 +38,11 @@ export default function HistoricoExperimentos() {
 
   const handleSaveEdit = async (experimentId) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/experiment/${experimentId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editingName }),
-      });
-      if (response.ok) {
-        setEditingId(null);
-        fetch("http://127.0.0.1:8000/experiment")
-          .then((res) => res.json())
-          .then((data) => setExperiments(data));
-      }
+      await apiPut(`/experiment/${experimentId}`, { name: editingName });
+      setEditingId(null);
+      apiGet("/experiment")
+        .then((data) => setExperiments(data))
+        .catch((err) => console.error("Erro ao buscar experimentos:", err));
     } catch (error) {
       console.error("Erro ao editar experimento:", error);
     }
@@ -57,14 +51,10 @@ export default function HistoricoExperimentos() {
   const handleDelete = async (experimentId) => {
     if (!confirm("Tem certeza que deseja deletar este experimento e todos os seus treinos?")) return;
     try {
-      const response = await fetch(`http://127.0.0.1:8000/experiment/${experimentId}`, {
-        method: "DELETE",
-      });
-      if (response.ok) {
-        fetch("http://127.0.0.1:8000/experiment")
-          .then((res) => res.json())
-          .then((data) => setExperiments(data));
-      }
+      await apiDelete(`/experiment/${experimentId}`);
+      apiGet("/experiment")
+        .then((data) => setExperiments(data))
+        .catch((err) => console.error("Erro ao buscar experimentos:", err));
     } catch (error) {
       console.error("Erro ao deletar experimento:", error);
     }

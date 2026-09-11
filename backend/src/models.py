@@ -1,6 +1,16 @@
 from sqlalchemy import Column, String, Integer, Float, Boolean, JSON, ForeignKey
 from .database import Base
 
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    password = Column(String)  # Senha criptografada
+    name = Column(String, nullable=True)  # Opcional
+    institution = Column(String, nullable=True)  # Opcional
+    course = Column(String, nullable=True)  # Opcional
+
 class Dataset(Base):
     __tablename__ = "datasets"
 
@@ -11,6 +21,7 @@ class Dataset(Base):
     num_classes = Column(Integer)
     input_shape = Column(JSON)  # Formato da entrada (ex: [224, 224, 3])
     num_images = Column(Integer)
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)  # Associação com usuário
 
 class Experiment(Base):
     __tablename__ = "experiments"
@@ -20,6 +31,7 @@ class Experiment(Base):
     dataset_id = Column(String, ForeignKey("datasets.id"), nullable=True)
     architecture = Column(String, default="simple")
     created_at = Column(String)  # Timestamp de criação
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)  # Associação com usuário
 
 class Train(Base):
     __tablename__ = "trains"

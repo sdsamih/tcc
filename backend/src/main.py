@@ -1,7 +1,8 @@
-from fastapi import FastAPI, BackgroundTasks, UploadFile, File, Form, Request
+from fastapi import FastAPI, BackgroundTasks, UploadFile, File, Form, Request, HTTPException, Depends
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import time
 import uuid
 import os
@@ -16,7 +17,8 @@ from sklearn.metrics import precision_score, recall_score, f1_score, confusion_m
 from src.database import engine
 from src.models import Base
 from src.database import SessionLocal
-from src.models import Train, Dataset, Experiment
+from src.models import Train, Dataset, Experiment, User
+from src.auth import verify_password, get_password_hash, create_access_token, decode_access_token
 
 import torch
 import torch.nn as nn
@@ -67,6 +69,34 @@ class ExperimentParams(BaseModel):
 
 class UpdateNameParams(BaseModel):
     name: str
+
+
+class RegisterParams(BaseModel):
+    username: str
+    password: str
+    name: str | None = None
+    institution: str | None = None
+    course: str | None = None
+
+
+class LoginParams(BaseModel):
+    username: str
+    password: str
+
+
+security = HTTPBearer()
+
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+    """Obtém o ID do usuário a partir do token JWT"""
+    token = credentials.credentials
+    payload = decode_access_token(token)
+    if payload is None:
+        raise HTTPException(status_code=401, detail="Token inválido ou expirado")
+    user_id = payload.get("sub")
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Token inválido")
+    return user_id
 
 
 # ---------------------------------------------------------------------------
@@ -511,11 +541,87 @@ def load_model_for_inference(model_path, architecture, num_classes):
 
 
 # ---------------------------------------------------------------------------
+# Autenticação
+# ---------------------------------------------------------------------------
+
+@app.post("/register")
+def register(params: RegisterParams):
+    """Registra um novo usuário"""
+    db = SessionLocal()
+    
+    # Verificar se o usuário já existe
+    existing_user = db.query(User).filter(User.username == params.username).first()
+    if existing_user:
+        db.close()
+        raise HTTPException(status_code=400, detail="Nome de usuário já existe")
+    
+    # Criar novo usuário
+    hashed_password = get_password_hash(params.password)
+    new_user = User(
+        id=str(uuid.uuid4()),
+        username=params.username,
+        password=hashed_password,
+        name=params.name,
+        institution=params.institution,
+        course=params.course,
+    )
+    
+    db.add(new_user)
+    db.commit()
+    user_id = new_user.id
+    db.close()
+    
+    return {"user_id": user_id, "username": params.username}
+
+
+@app.post("/login")
+def login(params: LoginParams):
+    """Faz login e retorna um token JWT"""
+    db = SessionLocal()
+    
+    user = db.query(User).filter(User.username == params.username).first()
+    if not user or not verify_password(params.password, user.password):
+        db.close()
+        raise HTTPException(status_code=401, detail="Credenciais inválidas")
+    
+    # Criar token de acesso
+    access_token = create_access_token(data={"sub": user.id})
+    db.close()
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user_id": user.id,
+        "username": user.username,
+    }
+
+
+@app.get("/me")
+def get_current_user_info(current_user_id: str = Depends(get_current_user)):
+    """Retorna informações do usuário atual"""
+    db = SessionLocal()
+    user = db.query(User).filter(User.id == current_user_id).first()
+    if not user:
+        db.close()
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    user_info = {
+        "id": user.id,
+        "username": user.username,
+        "name": user.name,
+        "institution": user.institution,
+        "course": user.course,
+    }
+    db.close()
+    return user_info
+
+
+# ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
 @app.post("/experiment")
-def create_experiment(params: ExperimentParams):
+def create_experiment(params: ExperimentParams, current_user_id: str = Depends(get_current_user)):
     db = SessionLocal()
 
     new_experiment = Experiment(
@@ -524,6 +630,7 @@ def create_experiment(params: ExperimentParams):
         dataset_id=params.dataset_id or None,
         architecture=params.architecture,
         created_at=time.strftime("%Y-%m-%d %H:%M:%S"),
+        user_id=current_user_id,
     )
 
     db.add(new_experiment)
@@ -535,9 +642,9 @@ def create_experiment(params: ExperimentParams):
 
 
 @app.get("/experiment")
-def list_experiments():
+def list_experiments(current_user_id: str = Depends(get_current_user)):
     db = SessionLocal()
-    experiments = db.query(Experiment).all()
+    experiments = db.query(Experiment).filter(Experiment.user_id == current_user_id).all()
 
     result = []
     for exp in experiments:
@@ -556,13 +663,18 @@ def list_experiments():
 
 
 @app.get("/experiment/{experiment_id}")
-def get_experiment(experiment_id: str):
+def get_experiment(experiment_id: str, current_user_id: str = Depends(get_current_user)):
     db = SessionLocal()
 
     exp = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not exp:
         db.close()
         return {"error": "not found"}
+    
+    # Verificar se o experimento pertence ao usuário
+    if exp.user_id != current_user_id:
+        db.close()
+        raise HTTPException(status_code=403, detail="Acesso negado")
 
     trains = db.query(Train).filter(Train.experiment_id == experiment_id).all()
 
@@ -580,20 +692,33 @@ def get_experiment(experiment_id: str):
 
 
 @app.get("/experiment/{experiment_id}/trains")
-def list_experiment_trains(experiment_id: str):
+def list_experiment_trains(experiment_id: str, current_user_id: str = Depends(get_current_user)):
     db = SessionLocal()
+    
+    # Verificar se o experimento pertence ao usuário
+    exp = db.query(Experiment).filter(Experiment.id == experiment_id).first()
+    if not exp or exp.user_id != current_user_id:
+        db.close()
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    
     trains = db.query(Train).filter(Train.experiment_id == experiment_id).all()
     db.close()
     return [_serialize_train(t) for t in trains]
 
 
 @app.put("/experiment/{experiment_id}")
-def update_experiment(experiment_id: str, params: UpdateNameParams):
+def update_experiment(experiment_id: str, params: UpdateNameParams, current_user_id: str = Depends(get_current_user)):
     db = SessionLocal()
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
         db.close()
         return {"error": "experiment not found"}
+    
+    # Verificar se o experimento pertence ao usuário
+    if experiment.user_id != current_user_id:
+        db.close()
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    
     experiment.name = params.name
     db.commit()
     db.close()
@@ -601,12 +726,17 @@ def update_experiment(experiment_id: str, params: UpdateNameParams):
 
 
 @app.delete("/experiment/{experiment_id}")
-def delete_experiment(experiment_id: str):
+def delete_experiment(experiment_id: str, current_user_id: str = Depends(get_current_user)):
     db = SessionLocal()
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
         db.close()
         return {"error": "experiment not found"}
+    
+    # Verificar se o experimento pertence ao usuário
+    if experiment.user_id != current_user_id:
+        db.close()
+        raise HTTPException(status_code=403, detail="Acesso negado")
 
     # Deletar todos os treinos associados
     trains = db.query(Train).filter(Train.experiment_id == experiment_id).all()
@@ -623,13 +753,18 @@ def delete_experiment(experiment_id: str):
 
 
 @app.post("/experiment/{experiment_id}/train")
-def create_train_in_experiment(experiment_id: str, params: TrainParams, background_tasks: BackgroundTasks):
+def create_train_in_experiment(experiment_id: str, params: TrainParams, background_tasks: BackgroundTasks, current_user_id: str = Depends(get_current_user)):
     db = SessionLocal()
 
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
         db.close()
         return {"error": "experiment not found"}
+    
+    # Verificar se o experimento pertence ao usuário
+    if experiment.user_id != current_user_id:
+        db.close()
+        raise HTTPException(status_code=403, detail="Acesso negado")
 
     train_id = str(uuid.uuid4())
 
@@ -655,32 +790,50 @@ def create_train_in_experiment(experiment_id: str, params: TrainParams, backgrou
 
 
 @app.get("/train")
-def list_trains():
+def list_trains(current_user_id: str = Depends(get_current_user)):
     db = SessionLocal()
-    trains = db.query(Train).all()
+    
+    # Listar apenas treinos dos experimentos do usuário
+    user_experiments = db.query(Experiment).filter(Experiment.user_id == current_user_id).all()
+    experiment_ids = [exp.id for exp in user_experiments]
+    trains = db.query(Train).filter(Train.experiment_id.in_(experiment_ids)).all()
+    
     db.close()
     return [_serialize_train(t, include_experiment=True) for t in trains]
 
 
 @app.get("/train/{train_id}")
-def get_train(train_id: str):
+def get_train(train_id: str, current_user_id: str = Depends(get_current_user)):
     db = SessionLocal()
     t = db.query(Train).filter(Train.id == train_id).first()
-    db.close()
-
+    
     if not t:
+        db.close()
         return {"error": "not found"}
-
+    
+    # Verificar se o treino pertence a um experimento do usuário
+    experiment = db.query(Experiment).filter(Experiment.id == t.experiment_id).first()
+    if not experiment or experiment.user_id != current_user_id:
+        db.close()
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    
+    db.close()
     return _serialize_train(t, include_experiment=True)
 
 
 @app.delete("/train/{train_id}")
-def delete_train(train_id: str):
+def delete_train(train_id: str, current_user_id: str = Depends(get_current_user)):
     db = SessionLocal()
     train = db.query(Train).filter(Train.id == train_id).first()
     if not train:
         db.close()
         return {"error": "train not found"}
+    
+    # Verificar se o treino pertence a um experimento do usuário
+    experiment = db.query(Experiment).filter(Experiment.id == train.experiment_id).first()
+    if not experiment or experiment.user_id != current_user_id:
+        db.close()
+        raise HTTPException(status_code=403, detail="Acesso negado")
 
     # Deletar arquivo do modelo se existir
     if train.model_path and os.path.exists(train.model_path):
@@ -693,13 +846,21 @@ def delete_train(train_id: str):
 
 
 @app.get("/train/{train_id}/download")
-def download_model(train_id: str):
+def download_model(train_id: str, current_user_id: str = Depends(get_current_user)):
     db = SessionLocal()
     t = db.query(Train).filter(Train.id == train_id).first()
-    db.close()
-
+    
     if not t or not t.model_path or not os.path.exists(t.model_path):
+        db.close()
         return {"error": "model not found or not ready"}
+    
+    # Verificar se o treino pertence a um experimento do usuário
+    experiment = db.query(Experiment).filter(Experiment.id == t.experiment_id).first()
+    if not experiment or experiment.user_id != current_user_id:
+        db.close()
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    
+    db.close()
 
     return FileResponse(
         t.model_path,
@@ -709,15 +870,22 @@ def download_model(train_id: str):
 
 
 @app.post("/train/{train_id}/predict")
-async def predict(train_id: str, file: UploadFile = File(...)):
+async def predict(train_id: str, file: UploadFile = File(...), current_user_id: str = Depends(get_current_user)):
     db = SessionLocal()
     t = db.query(Train).filter(Train.id == train_id).first()
+    
+    if not t or not t.model_path or not os.path.exists(t.model_path):
+        db.close()
+        return {"error": "model not found or not ready"}
+    
+    # Verificar se o treino pertence a um experimento do usuário
     experiment = db.query(Experiment).filter(Experiment.id == t.experiment_id).first()
+    if not experiment or experiment.user_id != current_user_id:
+        db.close()
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    
     num_classes = len(t.class_names) if t.class_names else 2
     db.close()
-
-    if not t or not t.model_path or not os.path.exists(t.model_path):
-        return {"error": "model not found or not ready"}
 
     model = load_model_for_inference(t.model_path, experiment.architecture, num_classes)
 
@@ -742,7 +910,7 @@ async def predict(train_id: str, file: UploadFile = File(...)):
 
 
 @app.post("/datasets/upload")
-async def upload_dataset(request: Request, file: UploadFile = File(...)):
+async def upload_dataset(request: Request, file: UploadFile = File(...), current_user_id: str = Depends(get_current_user)):
     # Ler o FormData manualmente
     form_data = await request.form()
     name = form_data.get("name", "Custom Dataset")
@@ -803,6 +971,7 @@ async def upload_dataset(request: Request, file: UploadFile = File(...)):
         classes=classes,
         num_classes=len(classes),
         num_images=num_images,
+        user_id=current_user_id,
     )
     db.add(new_dataset)
     db.commit()
@@ -818,9 +987,9 @@ async def upload_dataset(request: Request, file: UploadFile = File(...)):
 
 
 @app.get("/datasets")
-def list_datasets():
+def list_datasets(current_user_id: str = Depends(get_current_user)):
     db = SessionLocal()
-    datasets = db.query(Dataset).all()
+    datasets = db.query(Dataset).filter(Dataset.user_id == current_user_id).all()
     db.close()
 
     return [
@@ -836,12 +1005,18 @@ def list_datasets():
 
 
 @app.put("/datasets/{dataset_id}")
-def update_dataset(dataset_id: str, params: UpdateNameParams):
+def update_dataset(dataset_id: str, params: UpdateNameParams, current_user_id: str = Depends(get_current_user)):
     db = SessionLocal()
     dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
     if not dataset:
         db.close()
         return {"error": "dataset not found"}
+    
+    # Verificar se o dataset pertence ao usuário
+    if dataset.user_id != current_user_id:
+        db.close()
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    
     dataset.name = params.name
     db.commit()
     db.close()
@@ -849,12 +1024,17 @@ def update_dataset(dataset_id: str, params: UpdateNameParams):
 
 
 @app.delete("/datasets/{dataset_id}")
-def delete_dataset(dataset_id: str):
+def delete_dataset(dataset_id: str, current_user_id: str = Depends(get_current_user)):
     db = SessionLocal()
     dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
     if not dataset:
         db.close()
         return {"error": "dataset not found"}
+    
+    # Verificar se o dataset pertence ao usuário
+    if dataset.user_id != current_user_id:
+        db.close()
+        raise HTTPException(status_code=403, detail="Acesso negado")
 
     # Deletar arquivos do dataset
     if os.path.exists(dataset.path):

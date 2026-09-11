@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Download, Upload, Image as ImageIcon, CheckCircle, Loader2, Clock, Settings, Target, Info, Plus, FlaskConical, Play, Trash2 } from "lucide-react";
 import { Tooltip } from "react-tooltip";
+import { apiGet, apiPost, apiDelete } from "../utils/api";
 
 export default function DetalhesExperimento() {
   const { id } = useParams();
@@ -27,8 +28,7 @@ export default function DetalhesExperimento() {
 
   const fetchExperiment = async () => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/experiment/${id}`);
-      const data = await response.json();
+      const data = await apiGet(`/experiment/${id}`);
       setExperiment(data);
     } catch (error) {
       console.error("Erro ao buscar experimento:", error);
@@ -49,8 +49,7 @@ export default function DetalhesExperimento() {
       if (!selectedTrainId) return;
       
       try {
-        const response = await fetch(`http://127.0.0.1:8000/train/${selectedTrainId}`);
-        const data = await response.json();
+        const data = await apiGet(`/train/${selectedTrainId}`);
 
         if (data.status === "ready") {
           clearInterval(interval);
@@ -86,7 +85,12 @@ export default function DetalhesExperimento() {
     if (!selectedTrain) return;
     
     try {
-      const response = await fetch(`http://127.0.0.1:8000/train/${selectedTrain.id}/download`);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`http://127.0.0.1:8000/train/${selectedTrain.id}/download`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
 
       if (!response.ok) {
         console.error("Erro ao baixar modelo");
@@ -135,8 +139,12 @@ export default function DetalhesExperimento() {
 
     try {
       console.log("Enviando requisição de predict...");
+      const token = localStorage.getItem("token");
       const response = await fetch(`http://127.0.0.1:8000/train/${selectedTrain.id}/predict`, {
         method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        },
         body: formData,
       });
 
@@ -171,20 +179,7 @@ export default function DetalhesExperimento() {
     };
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/experiment/${id}/train`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        console.error("Erro ao criar treino");
-        return;
-      }
-
-      const data = await response.json();
+      const data = await apiPost(`/experiment/${id}/train`, payload);
       setShowRetrainForm(false);
       fetchExperiment(); // Recarregar experimento para mostrar o novo treino
       setSelectedTrainId(data.train_id);
@@ -196,14 +191,10 @@ export default function DetalhesExperimento() {
   const handleDeleteTrain = async (trainId) => {
     if (!confirm("Tem certeza que deseja deletar este treino?")) return;
     try {
-      const response = await fetch(`http://127.0.0.1:8000/train/${trainId}`, {
-        method: "DELETE",
-      });
-      if (response.ok) {
-        fetchExperiment();
-        if (selectedTrainId === trainId) {
-          setSelectedTrainId(null);
-        }
+      await apiDelete(`/train/${trainId}`);
+      fetchExperiment();
+      if (selectedTrainId === trainId) {
+        setSelectedTrainId(null);
       }
     } catch (error) {
       console.error("Erro ao deletar treino:", error);

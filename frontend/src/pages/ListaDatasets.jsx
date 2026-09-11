@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Database, Image as ImageIcon, Folder, Edit, Trash2 } from "lucide-react";
+import { apiGet, apiPut, apiDelete } from "../utils/api";
 
 export default function ListaDatasets() {
   const [datasets, setDatasets] = useState([]);
@@ -13,8 +14,7 @@ export default function ListaDatasets() {
 
   const fetchDatasets = async () => {
     try {
-      const response = await fetch("http://127.0.0.1:8000/datasets");
-      const data = await response.json();
+      const data = await apiGet("/datasets");
       setDatasets(data);
     } catch (error) {
       console.error("Erro ao buscar datasets:", error);
@@ -30,15 +30,9 @@ export default function ListaDatasets() {
 
   const handleSaveEdit = async (datasetId) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/datasets/${datasetId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editingName }),
-      });
-      if (response.ok) {
-        setEditingId(null);
-        fetchDatasets();
-      }
+      await apiPut(`/datasets/${datasetId}`, { name: editingName });
+      setEditingId(null);
+      fetchDatasets();
     } catch (error) {
       console.error("Erro ao editar dataset:", error);
     }
@@ -47,12 +41,8 @@ export default function ListaDatasets() {
   const handleDelete = async (datasetId) => {
     if (!confirm("Tem certeza que deseja deletar este dataset?")) return;
     try {
-      const response = await fetch(`http://127.0.0.1:8000/datasets/${datasetId}`, {
-        method: "DELETE",
-      });
-      if (response.ok) {
-        fetchDatasets();
-      }
+      await apiDelete(`/datasets/${datasetId}`);
+      fetchDatasets();
     } catch (error) {
       console.error("Erro ao deletar dataset:", error);
     }

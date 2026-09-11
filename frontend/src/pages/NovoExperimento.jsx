@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Database, Cpu, Play, Info, ArrowRight } from "lucide-react";
 import { Tooltip } from "react-tooltip";
+import { apiGet, apiPost } from "../utils/api";
 
 export default function NovoExperimento() {
   const [step, setStep] = useState(1); // 1: Criar experimento, 2: Criar primeiro treino
@@ -29,8 +30,7 @@ export default function NovoExperimento() {
     if (pendingExperimentId) {
       console.log("Carregando experiment_id do localStorage:", pendingExperimentId);
       // Verificar se o experimento ainda existe no backend
-      fetch(`http://127.0.0.1:8000/experiment/${pendingExperimentId}`)
-        .then(res => res.json())
+      apiGet(`/experiment/${pendingExperimentId}`)
         .then(data => {
           if (data.error) {
             // Experimento não existe mais, limpar localStorage
@@ -64,8 +64,7 @@ export default function NovoExperimento() {
 
   const fetchDatasets = async () => {
     try {
-      const response = await fetch("http://127.0.0.1:8000/datasets");
-      const data = await response.json();
+      const data = await apiGet("/datasets");
       setDatasets(data);
     } catch (error) {
       console.error("Erro ao buscar datasets:", error);
@@ -82,22 +81,7 @@ export default function NovoExperimento() {
     };
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/experiment", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        const errorMessage = typeof errorData === 'object' ? JSON.stringify(errorData) : errorData.detail || "Falha ao criar experimento";
-        setMessage(`Erro: ${errorMessage}`);
-        return;
-      }
-
-      const data = await response.json();
+      const data = await apiPost("/experiment", payload);
 
       console.log("Resposta do backend ao criar experimento:", data);
 
@@ -141,23 +125,7 @@ export default function NovoExperimento() {
     console.log("Payload a ser enviado:", payload);
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/experiment/${experimentId}/train`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        const errorMessage = typeof errorData === 'object' ? JSON.stringify(errorData) : errorData.detail || "Falha ao criar treino";
-        console.error("Erro na resposta:", errorData);
-        setMessage(`Erro: ${errorMessage}`);
-        return;
-      }
-
-      const data = await response.json();
+      const data = await apiPost(`/experiment/${experimentId}/train`, payload);
 
       if (!data.train_id) {
         setMessage("Erro: ID do treino não retornado");
